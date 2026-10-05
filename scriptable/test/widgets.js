@@ -27,6 +27,7 @@ const CASES = {
                           ['透明未設定', { param: '透明' }]],
   'todo-widget.js': [['通常', { reminders: REM.A }], ['過多', { reminders: REM.MANY }], ['長文', { reminders: REM.LONG }], ['完了', { reminders: REM.DONE }],
                      ['空', { reminders: [] }], ['権限なし', { remFail: true }], ['透明未設定', { reminders: REM.A, param: '透明' }]],
+  'clock-widget.js': [['通常', {}], ['0時台', { now: T(0, 0, 30) }], ['都市指定', { param: 'シドニー,オークランド,デリー' }], ['透明未設定', { param: '透明' }]],
   'habit-widget.js': [['通常', { hab: HAB.A }], ['記録なし', { hab: HAB.NONE }], ['1 つだけ', { hab: HAB.A, param: '読書' }], ['透明未設定', { hab: HAB.A, param: '透明' }]],
 };
 
@@ -106,6 +107,23 @@ const CASES = {
   r = await run({ file: 'habit-widget.js', family: 'small', now: T(0, 10) });
   t = dump(r.w);
   check('HABIT 記録ファイルなしでも表示', !r.errs.length && t.includes('タップで記録'));
+
+  // ---------- CLOCK ----------（テスト環境の端末時刻は UTC）
+  const dates = n => n.kind === 'date' ? [n] : (n.children || []).flatMap(dates);
+  r = await run({ file: 'clock-widget.js', family: 'large', now: new FDate(2026, 9, 5, 10, 30, 15) });
+  t = dump(r.w);
+  check('CLOCK 時刻はタイマー表示で進む（10:30:15）', dates(r.w).every(d => d.style === 'timer') && t.includes('{10:30:15 semiboldMono 44'));
+  check('CLOCK 世界時計と時差（LONDON 11:30:15 +1H / LA 3:30:15 -7H）', t.includes('{11:30:15') && t.includes('"+1H"') && t.includes('{3:30:15') && t.includes('"-7H"'));
+  check('CLOCK 次の正時に更新', r.w.refreshAfterDate.getTime() === new FDate(2026, 9, 5, 11, 0, 2).getTime());
+  r = await run({ file: 'clock-widget.js', family: 'large', now: new FDate(2026, 9, 5, 0, 30, 15) });
+  check('CLOCK 0 時台は 24:30:15', dump(r.w).includes('{24:30:15'));
+  r = await run({ file: 'clock-widget.js', family: 'accessoryInline', now: new FDate(2026, 9, 5, 10), param: 'デリー,東京' });
+  check('CLOCK 30 分単位の時差（+5.5H）と Parameter の都市', r.w.children[0].text === 'DELHI +5.5H ・ TOKYO +9H', r.w.children[0].text);
+  r = await run({ file: 'clock-widget.js', family: 'small', now: new FDate(2026, 9, 5, 10), param: 'デリー' });
+  check('CLOCK 時差が 30 分単位なら 30 分ごとに更新', r.w.refreshAfterDate.getTime() === new FDate(2026, 9, 5, 10, 30, 2).getTime());
+  r = await run({ file: 'clock-widget.js', family: 'accessoryRectangular', now: new FDate(2026, 9, 5, 10) });
+  check('CLOCK ロック画面は略称（LA）', dump(r.w).includes('"LA"'));
+  check('CLOCK タップで時計アプリ', (await run({ file: 'clock-widget.js', family: 'medium', now: new FDate(2026, 9, 5, 10) })).w.url === 'clock-alarm://');
 
   console.log(fail ? `\n${fail} 件失敗` : '\n全ケース OK');
   process.exitCode = fail ? 1 : 0;

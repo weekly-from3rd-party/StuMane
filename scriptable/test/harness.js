@@ -24,6 +24,9 @@ class DrawContext {
     return { __img: true, size: this.size, crop: this.drawn ? { src: this.drawn.img.name, x: -this.drawn.pt.x, y: -this.drawn.pt.y, w: this.size.width, h: this.size.height } : null }; }
 }
 class WidgetText { constructor(t) { if (typeof t !== 'string') throw new TypeError('addText(' + typeof t + ')'); this.kind = 'text'; this.text = t; } }
+class WidgetDate { constructor(d) { if (!(d instanceof Date)) throw new TypeError('addDate'); this.kind = 'date'; this.date = d; }
+  applyTimerStyle() { this.style = 'timer'; } applyTimeStyle() { this.style = 'time'; } applyDateStyle() { this.style = 'date'; }
+  applyRelativeStyle() { this.style = 'relative'; } applyOffsetStyle() { this.style = 'offset'; } leftAlignText() { this.align = 'left'; } centerAlignText() { this.align = 'center'; } rightAlignText() { this.align = 'right'; } }
 class WidgetImage { constructor(i) { if (!i || !i.__img) throw new TypeError('addImage'); this.kind = 'image'; } }
 class WidgetStack {
   constructor() { this.kind = 'stack'; this.dir = 'h'; this.children = []; }
@@ -31,6 +34,7 @@ class WidgetStack {
   setPadding(...a) { if (a.length !== 4 || !a.every(num)) throw new TypeError('setPadding'); this.padding = a; }
   addText(t) { const x = new WidgetText(t); this.children.push(x); return x; }
   addImage(i) { const x = new WidgetImage(i); this.children.push(x); return x; }
+  addDate(d) { const x = new WidgetDate(d); this.children.push(x); return x; }
   addStack() { const s = new WidgetStack(); this.children.push(s); return s; }
   addSpacer(n) { if (n !== undefined && !num(n)) throw new TypeError('spacer'); const s = { kind: 'spacer', length: n }; this.children.push(s); return s; }
 }
@@ -56,20 +60,25 @@ class WebView {
     });
   }
 }
-const ALLOW = { text: ['kind', 'text', 'font', 'textColor', 'textOpacity', 'lineLimit', 'minimumScaleFactor'], image: ['kind', 'imageSize'], spacer: ['kind', 'length'],
+const ALLOW = { text: ['kind', 'text', 'font', 'textColor', 'textOpacity', 'lineLimit', 'minimumScaleFactor'],
+  date: ['kind', 'date', 'style', 'align', 'font', 'textColor', 'textOpacity', 'lineLimit', 'minimumScaleFactor', 'url'], image: ['kind', 'imageSize'], spacer: ['kind', 'length'],
   stack: ['kind', 'dir', 'children', 'padding', 'size', 'backgroundColor', 'spacing', 'url', 'cornerRadius'],
   widget: ['kind', 'dir', 'children', 'padding', 'backgroundColor', 'backgroundImage', 'spacing', 'url', 'refreshAfterDate', 'addAccessoryWidgetBackground'] };
 function validate(n, p = 'W') {
   const e = [], bad = m => e.push(p + ': ' + m);
   Object.keys(n).forEach(k => { if (!ALLOW[n.kind].includes(k)) bad('unknown prop ' + k); });
+  if (n.kind === 'date') { if (!(n.font instanceof Font)) bad('font'); if (!n.style) bad('date style'); if (!n.align) bad('date align'); if (n.textColor !== undefined && !(n.textColor instanceof Color)) bad('color'); }
   if (n.kind === 'text') { if (!(n.font instanceof Font)) bad('font'); if (n.textColor !== undefined && !(n.textColor instanceof Color)) bad('color'); if (!Number.isInteger(n.lineLimit)) bad('lineLimit'); }
   if (n.kind === 'image' && !(n.imageSize instanceof Size)) bad('imageSize');
   if (n.children) { if (n.size !== undefined && !(n.size instanceof Size)) bad('size'); if (n.backgroundColor !== undefined && !(n.backgroundColor instanceof Color)) bad('bg');
-    if (n.url !== undefined && !/^(calshow:\d+|x-apple-reminderkit:\/\/|scriptable:\/\/\/run\?scriptName=[^&\s]+(&\w+=[^&\s]+)*)$/.test(n.url)) bad('url ' + n.url); if (n.refreshAfterDate !== undefined && !(n.refreshAfterDate instanceof Date)) bad('refresh');
+    if (n.url !== undefined && !/^(calshow:\d+|x-apple-reminderkit:\/\/|scriptable:\/\/\/run\?scriptName=[^&\s]+(&\w+=[^&\s]+)*|clock-(alarm|worldclock|timer|stopwatch):\/\/)$/.test(n.url)) bad('url ' + n.url); if (n.refreshAfterDate !== undefined && !(n.refreshAfterDate instanceof Date)) bad('refresh');
     n.children.forEach((c, i) => e.push(...validate(c, p + '/' + i))); }
   return e;
 }
+const timerText = n => { const t = Math.max(0, Math.floor((FIXED - n.date.getTime()) / 1000)), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = t % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(sec).padStart(2, '0'); };
 function dump(n, ind = '') {
+  if (n.kind === 'date') return ind + `{${n.style === 'timer' ? timerText(n) : n.style} ${n.font.name.replace('SystemFont', '').replace('Monospaced', 'Mono')} ${n.font.size}${n.textColor ? ' ' + n.textColor : ''}}\n`;
   if (n.kind === 'text') return n.text === '' ? '' : ind + `"${n.text}"  <${n.font.name.replace('SystemFont', '').replace('Monospaced', 'Mono')} ${n.font.size}${n.textColor ? ' ' + n.textColor : ''}>\n`;
   if (n.kind === 'image') return ind + `[DOT ${n.imageSize.width.toFixed(1)}x${n.imageSize.height}]\n`;
   if (n.kind === 'spacer') return '';
@@ -120,11 +129,12 @@ function shot(W, H, rects, rgb, name, icons = []) {
 }
 // 収まりの見積もり：和文を含む行は×1.32、英数字だけの行は×1.22
 const cjk = ch => /[\u3000-\u9fff\uff00-\uffef]/.test(ch);
-const H = n => n.kind === 'text' ? n.font.size * ([...n.text].some(cjk) ? 1.32 : 1.22) * (n.lineLimit || 1)
+const H = n => n.kind === 'date' ? n.font.size * 1.22 : n.kind === 'text' ? n.font.size * ([...n.text].some(cjk) ? 1.32 : 1.22) * (n.lineLimit || 1)
   : n.kind === 'image' ? n.imageSize.height : n.kind === 'spacer' ? (n.length || 0) : (n.size && n.size.height > 0) ? n.size.height
   : n.dir === 'h' ? Math.max(0, ...n.children.map(H))
   : n.children.map(H).reduce((a, b) => a + b, 0) + (n.spacing || 0) * Math.max(0, n.children.length - 1) + (n.padding ? n.padding[0] + n.padding[2] : 0);
-const W = n => { if (n.kind === 'text') { const m = n.font.name.includes('Mono'), f = n.minimumScaleFactor || 1;
+const W = n => { if (n.kind === 'date') return n.font.size * 0.6 * 8 * (n.minimumScaleFactor || 1);
+  if (n.kind === 'text') { const m = n.font.name.includes('Mono'), f = n.minimumScaleFactor || 1;
     return m ? [...n.text].reduce((a, c) => a + (cjk(c) ? n.font.size : n.font.size * .6), 0) * f : Math.min([...n.text].length, 2) * n.font.size; }
   if (n.kind === 'image') return n.imageSize.width; if (n.kind === 'spacer') return n.length || 0; if (n.size && n.size.width > 0) return n.size.width;
   const ws = n.children.map(W); return n.dir === 'v' ? Math.max(0, ...ws) + (n.padding ? n.padding[1] + n.padding[3] : 0) : ws.reduce((a, b) => a + b, 0) + (n.spacing || 0) * Math.max(0, n.children.length - 1); };
@@ -136,4 +146,4 @@ const DEV = {
   'ProMax':  { screen: [430, 932], small: [170, 170], medium: [364, 170], large: [364, 382] },
   'iPad11':  { pad: true, small: [155, 155], medium: [342, 155], large: [342, 342], extraLarge: [715, 342] },
 };
-module.exports = { run, dump, FDate, shot, FILES, reset, H, W, DEV };
+module.exports = { run, dump, FDate, shot, FILES, reset, H, W, DEV, timerText };
