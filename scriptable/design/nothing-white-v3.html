@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nothing 白基調 — ロック / ホーム</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Doto:wght@400;700;900&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{background:#101114;color:#e8e8ea;font-family:"Instrument Sans",system-ui,sans-serif}
+  body{min-height:100vh;padding:16px 12px 48px;display:flex;flex-direction:column;align-items:center}
+
+  .bar{width:100%;max-width:720px;display:flex;flex-direction:column;gap:12px;margin-bottom:18px}
+  .title{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8b8c92;font-family:"DM Mono",monospace}
+  .controls{display:flex;gap:10px;flex-wrap:wrap}
+  .seg{display:inline-flex;background:#1c1e22;border:1px solid #2b2e34;border-radius:4px;padding:3px}
+  .seg button{appearance:none;border:0;background:transparent;color:#9a9ba1;font-family:"DM Mono",monospace;font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;padding:8px 13px;border-radius:3px;cursor:pointer;transition:.18s}
+  .seg button.on{background:#34373e;color:#fff}
+
+  .stage{width:100%;display:flex;flex-direction:column;align-items:center;gap:16px}
+  .caption{max-width:540px;text-align:center;font-size:12.5px;line-height:1.75;color:#8f9096;padding:0 8px}
+
+  .device{width:min(94vw,360px);padding:10px;border-radius:52px;
+    background:linear-gradient(145deg,#232427,#141518);
+    box-shadow:0 24px 60px -20px rgba(0,0,0,.7),inset 0 0 0 1px rgba(255,255,255,.04)}
+  .stage[data-device="ipad"] .device{width:min(96vw,560px);border-radius:34px;padding:14px}
+
+  /* ===== Nothing 白基調トークン ===== */
+  .screen{
+    --wall:#f2f1ee; --ink:#0d0d0d; --dim:#6e6e6b; --faint:rgba(0,0,0,.34);
+    --line:rgba(0,0,0,.13); --soft:rgba(0,0,0,.06); --dot:rgba(0,0,0,.075);
+    --card:#ffffff; --accent:#ff3b30; --r:4px;
+    --cols:4; --pad:20px;
+    position:relative;border-radius:44px;overflow:hidden;aspect-ratio:360/740;
+    display:flex;flex-direction:column;background:var(--wall);color:var(--ink);
+    background-image:radial-gradient(var(--dot) 1px,transparent 1px);background-size:20px 20px;
+  }
+  .stage[data-device="ipad"] .screen{aspect-ratio:834/1194;border-radius:24px;--cols:6;--pad:28px}
+
+  /* 背景モチーフ */
+  .motif{position:absolute;inset:0;pointer-events:none}
+  .motif svg{position:absolute;opacity:.5}
+  .trace{right:-6%;bottom:6%;width:62%;height:34%}
+  .coil{left:-14%;top:16%;width:56%;height:34%;opacity:.32!important}
+  .crop{position:absolute;width:13px;height:13px}
+  .crop::before,.crop::after{content:"";position:absolute;background:var(--faint)}
+  .crop::before{left:0;top:0;width:13px;height:1px}
+  .crop::after{left:0;top:0;width:1px;height:13px}
+  .crop.tl{left:14px;top:52px}
+  .crop.tr{right:14px;top:52px;transform:scaleX(-1)}
+  .crop.bl{left:14px;bottom:16px;transform:scaleY(-1)}
+  .crop.br{right:14px;bottom:16px;transform:scale(-1)}
+  .techlabel{position:absolute;left:0;right:0;bottom:6px;display:flex;justify-content:space-between;
+    padding:0 30px;font-family:"DM Mono",monospace;font-size:7.5px;letter-spacing:.12em;color:var(--faint);text-transform:uppercase}
+
+  /* ステータスバー */
+  .statusbar{position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center;
+    padding:14px 26px 4px;font-family:"DM Mono",monospace;font-size:12px;letter-spacing:.06em}
+  .sb-r{display:flex;align-items:center;gap:6px}
+  .sb-r svg{width:15px;height:11px;fill:var(--ink)}
+  .bat{width:21px;height:11px;border:1px solid var(--ink);border-radius:2px;position:relative;opacity:.85}
+  .bat::after{content:"";position:absolute;right:-3px;top:3px;width:2px;height:5px;background:var(--ink);border-radius:1px}
+  .bat i{position:absolute;left:1.5px;top:1.5px;bottom:1.5px;width:70%;background:var(--ink);border-radius:1px}
+
+  .view{position:relative;z-index:2;flex:1;display:none;flex-direction:column;min-height:0}
+  .screen[data-view="lock"] .view.lock{display:flex}
+  .screen[data-view="home"] .view.home{display:flex}
+
+  /* ================= ロック画面 ================= */
+  .lock{padding:0 var(--pad)}
+  .lk-top{padding-top:18px;display:flex;flex-direction:column;align-items:center;gap:2px}
+  .lk-date{font-family:"DM Mono",monospace;font-size:12px;letter-spacing:.16em;color:var(--dim)}
+  .lk-clock{font-family:"Doto","DotGothic16",monospace;font-weight:900;font-size:clamp(74px,25vw,116px);
+    line-height:.92;letter-spacing:.01em;margin:2px 0 0}
+  .stage[data-device="ipad"] .lk-clock{font-size:clamp(96px,15vw,150px)}
+  .lk-strip{display:flex;justify-content:center;gap:10px;margin-top:14px;width:100%}
+  .chipw{flex:1;max-width:110px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+    padding:9px 10px;text-align:left}
+  .chipw .k{font-family:"DM Mono",monospace;font-size:8px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase}
+  .chipw .v{font-family:"Doto",monospace;font-weight:900;font-size:21px;line-height:1.1;margin-top:3px}
+  .chipw .s{font-family:"DotGothic16",monospace;font-size:9px;color:var(--dim);margin-top:2px;line-height:1.35}
+  .lk-fill{flex:1;min-height:8px}
+  .lk-cards{display:flex;flex-direction:column;gap:10px;padding-bottom:14px}
+  .stage[data-device="ipad"] .lk-cards{flex-direction:row}
+  .stage[data-device="ipad"] .lk-cards>*{flex:1}
+  .lk-actions{display:flex;justify-content:space-between;padding:0 4px 10px}
+  .abtn{width:42px;height:42px;border:1px solid var(--line);border-radius:50%;background:rgba(255,255,255,.6);
+    display:flex;align-items:center;justify-content:center}
+  .abtn svg{width:18px;height:18px;fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .hbar{width:110px;height:4px;border-radius:2px;background:rgba(0,0,0,.25);margin:0 auto 10px}
+
+  /* ================= 共通ウィジェット ================= */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;position:relative;overflow:hidden}
+  .eyebrow{font-family:"DM Mono",monospace;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  .wtitle{font-family:"DM Mono",monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+  .big{font-family:"Doto",monospace;font-weight:900;font-size:clamp(40px,12vw,60px);line-height:.9;margin:5px 0 0;letter-spacing:.01em}
+  .stage[data-device="ipad"] .big{font-size:clamp(46px,7vw,62px)}
+  .unit{font-size:12px;margin-left:5px;font-weight:700;color:var(--dim)}
+  .sub{font-family:"DotGothic16",monospace;font-size:10px;color:var(--dim);margin-top:7px;line-height:1.55}
+  .sub b{color:var(--ink)}
+  .dotmark{position:absolute;top:13px;right:13px;width:7px;height:7px;border-radius:50%;background:var(--accent)}
+
+  .task{display:flex;align-items:center;gap:8px;font-family:"DotGothic16",monospace;font-size:10px;padding:2.5px 0;line-height:1.3}
+  .box{width:12px;height:12px;border:1px solid var(--ink);flex:none;opacity:.55;position:relative;border-radius:1px}
+  .task.done .box{background:var(--accent);border-color:var(--accent);opacity:1}
+  .task.done .box::after{content:"";position:absolute;left:3.4px;top:1px;width:3.4px;height:6.4px;
+    border:1.6px solid #fff;border-top:0;border-left:0;transform:rotate(42deg)}
+  .task.done span{opacity:.45;text-decoration:line-through}
+
+  .prog{display:flex;flex-direction:column;gap:6px}
+  .pr-top{display:flex;justify-content:space-between;font-family:"DM Mono",monospace;font-size:9px;color:var(--dim);margin-bottom:3px}
+  .track{height:4px;background:var(--soft);overflow:hidden;border-radius:2px}
+  .fill{height:100%;background:var(--ink)}
+  .fill.a{background:var(--accent)}
+
+  .sched{display:flex;flex-direction:column;gap:6px}
+  .sc{display:flex;gap:9px;align-items:baseline}
+  .sc .t{font-family:"DM Mono",monospace;font-size:9.5px;color:var(--dim);min-width:34px}
+  .sc .n{font-family:"DotGothic16",monospace;font-size:10px;line-height:1.35}
+  .sc.now .n{color:var(--accent)}
+
+  /* ================= ホーム画面 ================= */
+  .home{padding:8px var(--pad) 0;gap:15px}
+  .widgets{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .stage[data-device="ipad"] .widgets{grid-template-columns:repeat(3,1fr)}
+  .only-ipad{display:none}
+  .stage[data-device="ipad"] .only-ipad{display:block}
+
+  .grid{display:grid;grid-template-columns:repeat(var(--cols),1fr);gap:clamp(12px,3.4vw,19px) clamp(8px,3vw,16px);align-content:start}
+  .tile{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .icon{width:100%;aspect-ratio:1;border-radius:22.4%;background:var(--card);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;color:var(--ink);box-shadow:0 1px 1px rgba(0,0,0,.03)}
+  .icon svg{width:52%;height:52%;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .icon.inv{background:var(--ink);border-color:var(--ink);color:#fff}
+  .icon.acc{background:var(--accent);border-color:var(--accent);color:#fff}
+  .label{font-family:"DM Mono","DotGothic16",monospace;font-size:8.5px;letter-spacing:.02em;color:#3a3a3a;
+    text-align:center;line-height:1.1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .dock{position:relative;z-index:2;margin:12px var(--pad) 14px;padding:11px;border-radius:var(--r);
+    background:rgba(255,255,255,.55);border:1px solid var(--line);
+    display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(12px,4vw,22px)}
+  .dock .label{display:none}
+  .pagedots{position:relative;z-index:2;display:flex;justify-content:center;gap:6px;padding-top:6px}
+  .pd{width:5px;height:5px;border-radius:50%;background:rgba(0,0,0,.18)}
+  .pd.on{background:var(--ink)}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="title">Nothing / White — Lock &amp; Home</div>
+  <div class="controls">
+    <div class="seg" id="viewSeg">
+      <button data-view="lock" class="on">ロック画面</button>
+      <button data-view="home">ホーム画面</button>
+    </div>
+    <div class="seg" id="devSeg">
+      <button data-device="iphone" class="on">iPhone</button>
+      <button data-device="ipad">iPad 11″</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage" data-device="iphone">
+  <div class="device">
+    <div class="screen" data-view="lock">
+
+      <div class="motif">
+        <span class="crop tl"></span><span class="crop tr"></span><span class="crop bl"></span><span class="crop br"></span>
+        <svg class="trace" viewBox="0 0 200 120" fill="none" stroke="rgba(0,0,0,.22)" stroke-width="1">
+          <path d="M200 20h-60l-20 20H60l-18 18v42"/>
+          <path d="M200 56h-38l-16 16H92"/>
+          <path d="M200 92h-72"/>
+          <circle cx="60" cy="40" r="3.2"/><circle cx="42" cy="100" r="3.2"/>
+          <circle cx="92" cy="72" r="3.2"/><circle cx="128" cy="92" r="3.2"/>
+        </svg>
+        <svg class="coil" viewBox="0 0 120 120" fill="none" stroke="rgba(0,0,0,.16)" stroke-width="1">
+          <circle cx="60" cy="60" r="16"/><circle cx="60" cy="60" r="26"/><circle cx="60" cy="60" r="36"/><circle cx="60" cy="60" r="46"/>
+        </svg>
+        <div class="techlabel"><span>Rakuno / Transfer 2027</span><span>Rev.3 · 2026.07</span></div>
+      </div>
+
+      <div class="statusbar">
+        <span id="clockSm">9:41</span>
+        <span class="sb-r">
+          <svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4"/><rect x="5" y="5" width="3" height="7"/><rect x="10" y="2.5" width="3" height="9.5"/><rect x="15" y="0" width="3" height="12"/></svg>
+          <svg viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4.5a11 11 0 0 1 14 0M4.5 7a7 7 0 0 1 9 0M9 9.6v.01"/></svg>
+          <span class="bat"><i></i></span>
+        </span>
+      </div>
+
+      <!-- ============ LOCK ============ -->
+      <div class="view lock">
+        <div class="lk-top">
+          <div class="lk-date" id="lkDate">7月24日 金曜日</div>
+          <div class="lk-clock" id="lkClock">9:41</div>
+          <div class="lk-strip">
+            <div class="chipw">
+              <div class="k">Kanto</div>
+              <div class="v" id="chipDays">32</div>
+              <div class="s">日後 / 8月25日</div>
+            </div>
+            <div class="chipw">
+              <div class="k">Next</div>
+              <div class="v">15:00</div>
+              <div class="s">小針研 訪問</div>
+            </div>
+            <div class="chipw">
+              <div class="k">Shift</div>
+              <div class="v">17-22</div>
+              <div class="s">無印良品</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lk-fill"></div>
+
+        <div class="lk-cards">
+          <div class="card">
+            <div class="wtitle">Today</div>
+            <div class="sched">
+              <div class="sc now"><span class="t">10:30</span><span class="n">環境共生学演習</span></div>
+              <div class="sc"><span class="t">13:00</span><span class="n">徳永研 ミーティング</span></div>
+              <div class="sc"><span class="t">17:00</span><span class="n">バイト（無印）</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="wtitle">Transfer Tasks</div>
+            <div class="task"><span class="box"></span><span>川崎ホテル予約（8/26）</span></div>
+            <div class="task"><span class="box"></span><span>JSABM 入会申請</span></div>
+            <div class="task done"><span class="box"></span><span>訪問確認メール送付</span></div>
+          </div>
+        </div>
+
+        <div class="lk-actions">
+          <div class="abtn"><svg viewBox="0 0 24 24"><path d="M9 4h6l1 3h3v11H5V7h3z"/><circle cx="12" cy="12.5" r="3"/></svg></div>
+          <div class="abtn"><svg viewBox="0 0 24 24"><path d="M9 3h6v7a3 3 0 0 1-6 0z"/><path d="M12 14v3M9.5 20h5"/></svg></div>
+        </div>
+        <div class="hbar"></div>
+      </div>
+
+      <!-- ============ HOME ============ -->
+      <div class="view home">
+        <div class="widgets">
+          <div class="card">
+            <span class="dotmark"></span>
+            <div class="eyebrow">Kanto Visit</div>
+            <div class="big" id="cdNum">32<span class="unit">日</span></div>
+            <div class="sub"><b>8/25 火 ▸ 8/28 金</b><br>茨城大 小針研 / 農工大 新村研</div>
+          </div>
+          <div class="card">
+            <div class="wtitle">編入準備</div>
+            <div class="task done"><span class="box"></span><span>小針先生 訪問確定</span></div>
+            <div class="task done"><span class="box"></span><span>新村先生 訪問確定</span></div>
+            <div class="task"><span class="box"></span><span>川崎ホテル予約</span></div>
+            <div class="task"><span class="box"></span><span>JSABM 入会申請</span></div>
+            <div class="task"><span class="box"></span><span>徳永先生 訪問報告</span></div>
+          </div>
+          <div class="card only-ipad">
+            <div class="wtitle">編入試験対策</div>
+            <div class="prog">
+              <div><div class="pr-top"><span>生物</span><span>70</span></div><div class="track"><div class="fill" style="width:70%"></div></div></div>
+              <div><div class="pr-top"><span>化学</span><span>55</span></div><div class="track"><div class="fill" style="width:55%"></div></div></div>
+              <div><div class="pr-top"><span>英語</span><span>60</span></div><div class="track"><div class="fill" style="width:60%"></div></div></div>
+              <div><div class="pr-top"><span>数学</span><span>30</span></div><div class="track"><div class="fill a" style="width:30%"></div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="1"/><path d="M4 9.5h16M8 3v4M16 3v4"/></svg></div><span class="label">カレンダー</span></div>
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><path d="M8 6h11M8 12h11M8 18h7"/><circle cx="4.3" cy="6" r="1.1"/><circle cx="4.3" cy="12" r="1.1"/><circle cx="4.3" cy="18" r="1.1"/></svg></div><span class="label">リマインダー</span></div>
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1"/><circle cx="9" cy="10" r="1.5"/><path d="M4.5 17l4.5-4.5 4 3.5 3-2.5 3.5 3.5"/></svg></div><span class="label">写真</span></div>
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg></div><span class="label">設定</span></div>
+
+          <div class="tile"><div class="icon inv"><svg viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="1"/><path d="M9 8v8M9 8l6 8M15 8v8"/></svg></div><span class="label">Notion</span></div>
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="11" height="16" rx="1"/><path d="M8.2 4v16"/><path d="M15.5 6.2l3 3-6.5 6.5-3 .5.5-3z"/></svg></div><span class="label">GoodNotes</span></div>
+          <div class="tile"><div class="icon acc"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/></svg></div><span class="label">Claude</span></div>
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><path d="M9 18V6l9-2v12"/><circle cx="6.4" cy="18" r="2.4"/><circle cx="15.4" cy="16" r="2.4"/></svg></div><span class="label">音楽</span></div>
+
+          <div class="tile"><div class="icon inv"><svg viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M7 18v-6M12 18V8M17 18V4" stroke-width="2.2"/></svg></div><span class="label">studymgr</span></div>
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><path d="M12 3l1.9 1.6 2.4-.5-.5 2.4L19.4 10l-2.1 1.5.5 2.4-2.4-.5L12 15.4 9.6 13l-2.4.5.5-2.4L5.6 9.6 8 8l-.5-2.4 2.4.5z"/><path d="M10.3 9.4h3M10.3 11.5h2.2" stroke-width="1.3"/></svg></div><span class="label">丸ポップ</span></div>
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><path d="M9 4L4 6v14l5-2 6 2 5-2V4l-5 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg></div><span class="label">マップ</span></div>
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg></div><span class="label">時計</span></div>
+
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><circle cx="8.5" cy="8.5" r="2.6"/><path d="M8.5 2.6v1.4M8.5 13v1.4M2.6 8.5H4M13 8.5h1.4M4.4 4.4l1 1M11.6 11.6l1 1"/><path d="M8 20h9a3.4 3.4 0 0 0 0-6.8 4.8 4.8 0 0 0-9-1.2"/></svg></div><span class="label">天気</span></div>
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1"/><path d="M4.6 7.5L12 13l7.4-5.5"/></svg></div><span class="label">メール</span></div>
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><path d="M12 20s-6.5-4.2-6.5-9A3.3 3.3 0 0 1 12 8.3 3.3 3.3 0 0 1 18.5 11c0 4.8-6.5 9-6.5 9z"/><path d="M6 12h2.5l1.3-2.3L12 14l1.4-2 .8 1.2H18" stroke-width="1.3"/></svg></div><span class="label">ヘルスケア</span></div>
+          <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8.2 15l3-6.5 3 6.5M9.5 13h4.2"/></svg></div><span class="label">App Store</span></div>
+
+          <div class="tile only-ipad"><div class="icon"><svg viewBox="0 0 24 24"><path d="M3.5 8V6.5A1.5 1.5 0 0 1 5 5h4l2 2h8a1 1 0 0 1 1 1v9.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z"/></svg></div><span class="label">ファイル</span></div>
+          <div class="tile only-ipad"><div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.6 12h16.8M12 3.6c4.5 5 4.5 11.8 0 16.8-4.5-5-4.5-11.8 0-16.8z"/></svg></div><span class="label">翻訳</span></div>
+        </div>
+
+        <div class="pagedots"><span class="pd on"></span><span class="pd"></span><span class="pd"></span></div>
+      </div>
+
+      <div class="dock" id="dock">
+        <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><path d="M6.5 3.2h3l1.4 3.8-1.9 1.4a11.5 11.5 0 0 0 5 5l1.4-1.9 3.8 1.4v3c0 1-.9 1.9-1.9 1.9A15.6 15.6 0 0 1 4.6 5.1c0-1 .9-1.9 1.9-1.9z"/></svg></div></div>
+        <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></div></div>
+        <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H9.5l-4 3.5v-3.5H4z"/><path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01" stroke-width="2"/></svg></div></div>
+        <div class="tile"><div class="icon"><svg viewBox="0 0 24 24"><rect x="3.5" y="7" width="17" height="12" rx="1"/><circle cx="12" cy="13" r="3.2"/><path d="M9 7l1.4-2.4h3L14.9 7"/></svg></div></div>
+      </div>
+
+    </div>
+  </div>
+  <p class="caption" id="cap"></p>
+</div>
+
+<script>
+  const stage=document.querySelector('.stage'), screen=document.querySelector('.screen'),
+        dock=document.getElementById('dock');
+  const caps={
+    lock:"ロック画面 — ドットマトリクス時計（Doto）＋関東訪問カウントダウン・次の予定・シフトの3チップ。下部に今日の予定と編入タスク。背景に配線トレース／充電コイル／クロップマークをうっすら。",
+    home:"ホーム画面 — 白いタイルに1.5px線画グリフ。Notionは黒反転、Claudeは赤の1点差しでアクセントを集約。ラベルはDM Mono＋ドット和文。"
+  };
+  function setOn(sel,btn){document.querySelectorAll(sel+' button').forEach(x=>x.classList.toggle('on',x===btn));}
+  function sync(){
+    const v=screen.dataset.view;
+    dock.style.display = v==='home' ? 'grid':'none';
+    document.getElementById('cap').textContent=caps[v];
+  }
+  document.querySelectorAll('#viewSeg button').forEach(b=>b.onclick=()=>{screen.dataset.view=b.dataset.view;setOn('#viewSeg',b);sync();});
+  document.querySelectorAll('#devSeg button').forEach(b=>b.onclick=()=>{stage.dataset.device=b.dataset.device;setOn('#devSeg',b);});
+
+  const W=['日','月','火','水','木','金','土'];
+  function tick(){
+    const d=new Date(), t=d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+    document.getElementById('clockSm').textContent=t;
+    document.getElementById('lkClock').textContent=t;
+    document.getElementById('lkDate').textContent=`${d.getMonth()+1}月${d.getDate()}日 ${W[d.getDay()]}曜日`;
+  }
+  tick(); setInterval(tick,10000);
+
+  const days=Math.max(0,Math.ceil((new Date(2026,7,25)-new Date())/86400000));
+  document.getElementById('chipDays').textContent=days;
+  document.getElementById('cdNum').innerHTML=days+'<span class="unit">日</span>';
+  sync();
+</script>
+</body>
+</html>

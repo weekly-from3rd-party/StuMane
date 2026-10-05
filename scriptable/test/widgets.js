@@ -1,0 +1,112 @@
+// COUNTDOWN / TODO / HABIT の検査：機種別の収まり（5 機種 × 全サイズ × ケース）と、計算・記録の回帰テスト
+const { run, dump, FDate, FILES, reset, H, W, DEV } = require('./harness');
+let fail = 0; const check = (n, ok, x = '') => { if (!ok) fail++; console.log((ok ? 'OK  ' : 'NG  ') + n + (x ? '  ' + x : '')); };
+const T = (d, h, m = 0) => new FDate(2026, 9, 5 + d, h, m);   // 基準日 2026-10-05（月）
+
+// ---------- TODO 用のリマインダー ----------
+const rem = (title, due, timed = true, o = {}) => ({ title, dueDate: due, dueDateIncludesTime: timed, isCompleted: false, completionDate: null, priority: 0, calendar: { title: '仕事' }, ...o });
+const REM = {
+  A: [rem('レポート提出', T(-1, 0), false), rem('洗濯', T(0, 9)), rem('牛乳を買う', T(0, 0), false, { calendar: { title: '買い物' } }), rem('ゼミ資料を印刷', T(0, 15)),
+      rem('メール返信', T(0, 18)), rem('ジム', T(1, 19)), rem('家賃', T(1, 0), false), rem('済み', T(0, 8), true, { isCompleted: true, completionDate: T(0, 8, 30) })],
+  MANY: Array.from({ length: 12 }, (_, i) => rem('やること' + i, T(0, 9 + i))).concat([rem('明日の用事', T(1, 9))]),
+  LONG: [rem('環境共生学演習のフィールド調査レポートを提出して先生にメールで連絡する', T(0, 13))],
+  DONE: [rem('済み', T(0, 8), true, { isCompleted: true, completionDate: T(0, 8, 30) })],
+};
+
+// ---------- HABIT 用の記録 ----------
+const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const days = list => list.map(k => ymd(T(-k, 0)));
+const seedHabit = (rec) => { reset(); if (rec) { FILES.set('/icloud/habit/records.json', JSON.stringify(rec)); } };
+const HAB = {
+  A: { '筋トレ': days([0, 1, 2, 3, 4, 6]), '読書': days([1, 2, 3]), '勉強': days([2, 5, 9]) },
+  NONE: {},
+};
+
+const CASES = {
+  'countdown-widget.js': [['通常', {}], ['年', { param: '年' }], ['絞り込み・該当なし', { param: 'ないもの' }], ['大晦日', { now: new FDate(2026, 11, 31, 23, 50) }],
+                          ['透明未設定', { param: '透明' }]],
+  'todo-widget.js': [['通常', { reminders: REM.A }], ['過多', { reminders: REM.MANY }], ['長文', { reminders: REM.LONG }], ['完了', { reminders: REM.DONE }],
+                     ['空', { reminders: [] }], ['権限なし', { remFail: true }], ['透明未設定', { reminders: REM.A, param: '透明' }]],
+  'habit-widget.js': [['通常', { hab: HAB.A }], ['記録なし', { hab: HAB.NONE }], ['1 つだけ', { hab: HAB.A, param: '読書' }], ['透明未設定', { hab: HAB.A, param: '透明' }]],
+};
+
+(async () => {
+  // ---------- 収まり ----------
+  for (const [file, cases] of Object.entries(CASES)) {
+    let bad = 0; const worst = {};
+    for (const [dev, cfg] of Object.entries(DEV)) {
+      const fams = Object.keys(cfg).filter(k => k !== 'screen' && k !== 'pad').concat(['accessoryCircular', 'accessoryInline']);
+      for (const fam of fams) for (const [name, c] of cases) {
+        if (file === 'habit-widget.js') seedHabit(c.hab); else reset();
+        const r = await run({ file, family: fam, now: c.now || T(0, 10, 30), screen: cfg.screen, pad: cfg.pad, ...c });
+        if (!cfg[fam]) { if (r.errs.length) { bad++; console.log(`NG ${file} ${dev} ${fam} ${name} ${r.errs[0]}`); } continue; }
+        const h = H(r.w), w = W(r.w), [lw, lh] = cfg[fam], ok = h <= lh && w <= lw && !r.errs.length;
+        const key = dev + ' ' + fam; if (!worst[key] || lh - h < worst[key].m) worst[key] = { m: lh - h, h, lh, name };
+        if (!ok) { bad++; console.log(`NG ${file} ${key} ${name} 高さ ${h.toFixed(0)}/${lh} 幅 ${w.toFixed(0)}/${lw} ${r.errs[0] || ''}`); }
+      }
+    }
+    const tight = Object.entries(worst).sort((a, b) => a[1].m - b[1].m).slice(0, 3).map(([k, v]) => `${k}「${v.name}」余裕 ${v.m.toFixed(0)}pt`).join(' / ');
+    check(`${file} 収まり（最も余裕が少ない: ${tight}）`, !bad);
+  }
+
+  // ---------- COUNTDOWN ----------
+  let r = await run({ file: 'countdown-widget.js', family: 'medium', now: T(0, 10, 30) });
+  let t = dump(r.w);
+  check('COUNTDOWN 今年の残り（10/05 → あと 87 日・76%）', t.includes('"76%"') && (await run({ file: 'countdown-widget.js', family: 'accessoryInline', now: T(0, 10, 30), param: 'ないもの' })).w.children[0].text === '2026年 あと 87日');
+  check('COUNTDOWN 近い順・最も近い 1 件だけ赤', /"D-80".*#ff3b30/.test(t) && !/"D-112".*#ff3b30/.test(t) && t.indexOf('冬休み') < t.indexOf('期末試験'));
+  check('COUNTDOWN 毎年の日付（03-14 → 来年 3/14 で D-160）', t.includes('"D-160"') && t.includes('"03.14"'));
+  r = await run({ file: 'countdown-widget.js', family: 'small', now: new FDate(2026, 11, 24, 9) });
+  t = dump(r.w);
+  check('COUNTDOWN 当日は TODAY / D-DAY', t.includes('"TODAY"') && t.includes('"D-DAY"'));
+  r = await run({ file: 'countdown-widget.js', family: 'accessoryInline', now: new FDate(2026, 11, 25, 9) });
+  check('COUNTDOWN 過ぎた日付は出さない', r.w.children[0].text === '期末試験まで あと31日', r.w.children[0].text);
+  r = await run({ file: 'countdown-widget.js', family: 'accessoryInline', now: T(0, 10), param: '期末' });
+  check('COUNTDOWN Parameter で名前を絞り込み', r.w.children[0].text === '期末試験まで あと112日', r.w.children[0].text);
+  r = await run({ file: 'countdown-widget.js', family: 'large', now: T(0, 10, 30) });
+  t = dump(r.w);
+  check('COUNTDOWN 大：今月・今週・今日の残り', t.includes('"あと 26日"') && t.includes('"あと 6日"') && t.includes('"あと 13時間"'));
+
+  // ---------- TODO ----------
+  r = await run({ file: 'todo-widget.js', family: 'medium', now: T(0, 10, 30), reminders: REM.A });
+  t = dump(r.w);
+  const order = ['レポート提出', '洗濯', 'ゼミ資料を印刷', 'メール返信', '牛乳を買う'].map(s => t.indexOf(s));
+  check('TODO 並び順：期限切れ → 時刻あり → 日付だけ', order.every((v, i) => v > 0 && (!i || v > order[i - 1])), order.join(','));
+  check('TODO 期限切れは LATE・最も急ぐ 1 件だけ赤', (t.match(/#ff3b30/g) || []).length === 2 && /"LATE"  <mediumMono 11.5 #ff3b30>/.test(t));
+  check('TODO 残り件数と完了（1/6）', t.includes('"1/6"'));
+  r = await run({ file: 'todo-widget.js', family: 'medium', now: T(0, 10, 30), reminders: REM.A, param: '買い物' });
+  t = dump(r.w);
+  check('TODO Parameter でリストを絞り込み', t.includes('牛乳を買う') && !t.includes('洗濯'));
+  r = await run({ file: 'todo-widget.js', family: 'large', now: T(0, 10, 30), reminders: REM.MANY });
+  t = dump(r.w);
+  check('TODO 大：入りきらない分は +N件、明日の欄も残る', /"\+\d+件"/.test(t) && t.includes('明日の用事'));
+  r = await run({ file: 'todo-widget.js', family: 'small', now: T(0, 10, 30), reminders: REM.DONE });
+  check('TODO 全部済んだら「完了」', dump(r.w).includes('今日のやることは完了'));
+  check('TODO タップでリマインダーを開く', r.w.url === 'x-apple-reminderkit://');
+
+  // ---------- HABIT ----------
+  seedHabit(HAB.A);
+  r = await run({ file: 'habit-widget.js', family: 'medium', now: T(0, 10, 30), scriptName: '習慣' });
+  t = dump(r.w);
+  check('HABIT 連続日数（今日済み 5 日 / 今日まだでも昨日まで 3 日 / 途切れ 0 日）', /筋トレ[\s\S]*?"5日"[\s\S]*?読書[\s\S]*?"3日"[\s\S]*?勉強[\s\S]*?"0日"/.test(t));
+  check('HABIT 完了数 1/3', t.includes('"1/3 DONE"'));
+  const rows = r.w.children.find(c => c.dir === 'v' && c.children.some(x => x.url));
+  check('HABIT 行のタップで記録用の URL', rows && rows.children[1].url === 'scriptable:///run?scriptName=%E7%BF%92%E6%85%A3&habit=%E8%AA%AD%E6%9B%B8', rows && rows.children[1].url);
+  // タップ → 記録 → 反映
+  r = await run({ file: 'habit-widget.js', app: true, now: T(0, 21), query: { habit: '読書' } });
+  check('HABIT タップで今日を記録（連続 4 日）', r.log.some(l => l.includes('✓ 読書') && l.includes('連続 4 日')), r.log.join(' | '));
+  r = await run({ file: 'habit-widget.js', family: 'accessoryInline', now: T(0, 21, 30) });
+  check('HABIT 記録が反映される', r.w.children[0].text === 'HABIT 2/3 ・ 次: 勉強', r.w.children[0].text);
+  r = await run({ file: 'habit-widget.js', app: true, now: T(0, 22), query: { habit: '読書' }, alerts: [0, 0] });
+  r = await run({ file: 'habit-widget.js', family: 'accessoryInline', now: T(0, 22, 30) });
+  check('HABIT 済みをもう一度タップ → 取り消し', r.w.children[0].text === 'HABIT 1/3 ・ 次: 読書', r.w.children[0].text);
+  r = await run({ file: 'habit-widget.js', app: true, now: T(0, 22), sheets: [1, 2, 3] });
+  r = await run({ file: 'habit-widget.js', family: 'large', now: T(0, 22, 30) });
+  check('HABIT 過去 7 日の記録を直す（勉強の 10/02 を付ける → 連続 0 のまま・28 日中 4）', dump(r.w).includes('"4/28"'));
+  seedHabit(null);
+  r = await run({ file: 'habit-widget.js', family: 'small', now: T(0, 10) });
+  t = dump(r.w);
+  check('HABIT 記録ファイルなしでも表示', !r.errs.length && t.includes('タップで記録'));
+
+  console.log(fail ? `\n${fail} 件失敗` : '\n全ケース OK');
+  process.exitCode = fail ? 1 : 0;
+})().catch(e => { console.log('THROW', e.stack); process.exitCode = 1; });

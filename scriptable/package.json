@@ -1,0 +1,10 @@
+{
+  "name": "scriptable-today-tomorrow",
+  "private": true,
+  "description": "Scriptable 用ウィジェット TODAY / TOMORROW・COUNTDOWN・TODO・HABIT（Nothing 白基調）",
+  "scripts": {
+    "test": "node test/fit.js && node test/regress.js && node test/widgets.js",
+    "dump": "node test/dump.js"
+  },
+  "engines": { "node": ">=18" }
+}
