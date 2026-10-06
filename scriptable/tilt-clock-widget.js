@@ -6,8 +6,10 @@
    TILT ― 90 度回した時計（ロック画面用）
    ------------------------------------------------------------
    横向きに寝た姿勢から読めるよう、時刻を 90 度回して表示します
-   （Scriptable 用）。表示は 30 分刻みです。
-     23:10 → 23　／　23:40 → 23.5　／　7:40 → 7.5
+   （Scriptable 用）。表示は 30 分刻みで、3 つの書き方から選べます。
+     小数（既定）… 23:10 → 23　　／ 23:40 → 23.5
+     時刻       … 23:10 → 23:00 ／ 23:40 → 23:30
+     半         … 23:10 → 23　　／ 23:40 → 23 ＋ 半の印（ドット 1 つが点く）
 
    回した表示は画像なので、iOS が描き直したときにしか変わりません。
    毎時 00 分と 30 分に描き直すよう頼みますが、実際の時刻は iOS が
@@ -18,14 +20,17 @@
      ホーム画面：小 / 中 / 大（白基調のカードに同じ表示）
 
    ウィジェット設定の「Parameter」（任意・カンマ区切り）
+     小数 / 時刻 / 半 … 書き方（23.5 / 23:30 / 23 ＋ 半の印）
      右    … 右に 90 度回す（既定は左に 90 度）
      dark  … ホーム画面で暗色（ロック画面は iOS が色を決める）
+     例）時刻,右
    ============================================================ */
 
 // ---------- 設定 ----------
 const CONFIG = {
   theme: "light",   // "light"（白基調・既定）/ "dark"（ホーム画面のときだけ）
   turn: "left",     // "left"（左に 90 度）/ "right"（右に 90 度）
+  style: "decimal", // "decimal"（23.5）/ "colon"（23:30）/ "half"（23 ＋ 半の印）
 };
 
 // ---------- パラメータ ----------
@@ -34,6 +39,8 @@ const PARAMS = String(args.widgetParameter || "")
 const THEME = PARAMS.map(p => p.toLowerCase()).find(p => p === "dark" || p === "light") || CONFIG.theme;
 const TURN = PARAMS.some(p => /^(右|right)$/i.test(p)) ? "right"
   : PARAMS.some(p => /^(左|left)$/i.test(p)) ? "left" : CONFIG.turn;
+const STYLES = { "小数": "decimal", "23.5": "decimal", decimal: "decimal", "時刻": "colon", "23:30": "colon", colon: "colon", "半": "half", half: "half" };
+const STYLE = PARAMS.map(p => STYLES[p.toLowerCase()]).find(Boolean) || STYLES[CONFIG.style] || "decimal";
 
 // ---------- 色（Nothing デザインテンプレ：白基調） ----------
 const PALETTES = {
@@ -57,6 +64,9 @@ const GLYPHS = {
   "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
   "9": ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
   ".": ["0", "0", "0", "0", "0", "0", "1"],
+  ":": ["0", "0", "1", "0", "1", "0", "0"],
+  "*": ["0", "0", "0", "1", "0", "0", "0"],   // 半の印（点いている）
+  "o": ["0", "0", "0", "0", "0", "0", "0"],   // 半の印（消えている）
 };
 
 // 描く枠（pt）。長方形・円形は小さい機種にも収まる大きさにしておく
@@ -75,10 +85,8 @@ function makeWidget(family, now) {
   const w = new ListWidget();
   w.url = "clock-alarm://";
   w.refreshAfterDate = nextHalf(now);
-  const label = hourLabel(now);
-
   if (family === "accessoryInline") {
-    const t = w.addText(label + "時");
+    const t = w.addText(inlineLabel(now));
     t.font = Font.mediumSystemFont(12);
     t.lineLimit = 1;
     return w;
@@ -90,7 +98,7 @@ function makeWidget(family, now) {
     w.backgroundColor = P.bg;
   }
   const frame = FRAME[family] || FRAME.small;
-  const lines = family === "accessoryCircular" ? [label] : splitLabel(label);
+  const lines = timeLines(now, family === "accessoryCircular");
   const row = w.addStack();
   row.layoutHorizontally();
   row.addSpacer();
@@ -100,15 +108,21 @@ function makeWidget(family, now) {
   return w;
 }
 
-// 30 分刻みの時：23:10 → "23" / 23:40 → "23.5"
-function hourLabel(now) {
-  return String(now.getHours()) + (now.getMinutes() >= 30 ? ".5" : "");
+// 30 分刻みのドット文字の行。1 行目は時、2 行目は 30 分の印（oneLine = 円形用に 1 行へまとめる）
+//   小数：["23"] / ["23", ".5"]　時刻：["23", ":00"] / ["23", ":30"]　半：["23", "o"] / ["23", "*"]
+function timeLines(now, oneLine) {
+  const h = String(now.getHours()), half = now.getMinutes() >= 30;
+  const second = STYLE === "colon" ? (half ? ":30" : ":00") : STYLE === "half" ? (half ? "*" : "o") : (half ? ".5" : "");
+  if (oneLine) return [h + second];
+  return second ? [h, second] : [h];
 }
 
-// 長方形・ホーム画面は 2 行に分けて数字を大きく（"23.5" → "23" と ".5"）
-function splitLabel(label) {
-  const i = label.indexOf(".");
-  return i < 0 ? [label] : [label.slice(0, i), label.slice(i)];
+// インライン（回せないので文字だけ）
+function inlineLabel(now) {
+  const h = now.getHours(), half = now.getMinutes() >= 30;
+  if (STYLE === "colon") return h + ":" + (half ? "30" : "00");
+  if (STYLE === "half") return h + "時" + (half ? "半" : "");
+  return h + (half ? ".5" : "") + "時";
 }
 
 // 次の 00 分か 30 分（の 5 秒後）
@@ -189,6 +203,7 @@ async function chooseFamily() {
   const opts = [["ロック画面（長方形）", "accessoryRectangular"], ["ロック画面（円形）", "accessoryCircular"], ["小", "small"], ["中", "medium"]];
   const a = new Alert();
   a.title = "プレビュー";
+  a.message = "書き方はウィジェットの Parameter で選びます（小数 / 時刻 / 半）。いまは「" + { decimal: "小数", colon: "時刻", half: "半" }[STYLE] + "」";
   opts.forEach(o => a.addAction(o[0]));
   a.addCancelAction("キャンセル");
   const i = await a.presentSheet();

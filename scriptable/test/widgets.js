@@ -29,7 +29,8 @@ const CASES = {
                      ['空', { reminders: [] }], ['権限なし', { remFail: true }], ['透明未設定', { reminders: REM.A, param: '透明' }]],
   'clock-widget.js': [['通常', {}], ['0時台', { now: T(0, 0, 30) }], ['都市指定', { param: 'シドニー,オークランド,デリー' }], ['透明未設定', { param: '透明' }]],
   'launcher-widget.js': [['1 ページ目', {}], ['2 ページ目', { param: '2' }], ['空ページ', { param: '9' }], ['透明未設定', { param: '透明' }]],
-  'tilt-clock-widget.js': [['ちょうど', { now: T(0, 23, 0) }], ['半', { now: T(0, 23, 40) }], ['1 桁', { now: T(0, 7, 40) }], ['右', { now: T(0, 23, 40), param: '右' }]],
+  'tilt-clock-widget.js': [['ちょうど', { now: T(0, 23, 0) }], ['半', { now: T(0, 23, 40) }], ['1 桁', { now: T(0, 7, 40) }], ['右', { now: T(0, 23, 40), param: '右' }],
+                           ['時刻', { now: T(0, 23, 40), param: '時刻' }], ['半の印', { now: T(0, 7, 40), param: '半' }]],
   'habit-widget.js': [['通常', { hab: HAB.A }], ['記録なし', { hab: HAB.NONE }], ['1 つだけ', { hab: HAB.A, param: '読書' }], ['透明未設定', { hab: HAB.A, param: '透明' }]],
 };
 
@@ -169,14 +170,19 @@ const CASES = {
   check('LAUNCHER 一覧で選ぶとそのアプリを開く', r.log.includes('open claude://'), r.log.join(' | '));
 
   // ---------- TILT（90 度回した時計） ----------
-  const tiltText = async (h, m) => (await run({ file: 'tilt-clock-widget.js', family: 'accessoryInline', now: T(0, h, m) })).w.children[0].text;
-  check('TILT 30 分刻み（23:10→23 / 23:40→23.5 / 7:40→7.5 / 0:05→0）',
+  const tiltImg = x => x.w.children[0].children.find(c => c.kind === 'image').src;
+  const tiltText = async (h, m, param) => (await run({ file: 'tilt-clock-widget.js', family: 'accessoryInline', now: T(0, h, m), param })).w.children[0].text;
+  check('TILT 小数（既定）：23:10→23 / 23:40→23.5 / 7:40→7.5 / 0:05→0',
     [await tiltText(23, 10), await tiltText(23, 40), await tiltText(7, 40), await tiltText(0, 5)].join(' ') === '23時 23.5時 7.5時 0時');
+  check('TILT 時刻：23:10→23:00 / 23:40→23:30', [await tiltText(23, 10, '時刻'), await tiltText(23, 40, '時刻,右')].join(' ') === '23:00 23:30');
+  check('TILT 半：23:10→23時 / 23:40→23時半', [await tiltText(23, 10, '半'), await tiltText(23, 40, '半')].join(' ') === '23時 23時半');
+  // 半の印：30 分前は消えたドット 1 つ、30 分過ぎは点いたドット 1 つ（点灯ドット数の差が 1）
+  const litCount = async (m, param) => tiltImg(await run({ file: 'tilt-clock-widget.js', family: 'accessoryRectangular', now: T(0, 23, m), param })).ops.filter(o => o.c.alpha > .5).length;
+  check('TILT 半の印は 30 分を過ぎると 1 つ点く', (await litCount(40, '半')) - (await litCount(10, '半')) === 1);
   r = await run({ file: 'tilt-clock-widget.js', family: 'accessoryRectangular', now: T(0, 23, 10) });
   check('TILT 次の 30 分で描き直す（23:10→23:30）', r.w.refreshAfterDate.getTime() === new FDate(2026, 9, 5, 23, 30, 5).getTime());
   r = await run({ file: 'tilt-clock-widget.js', family: 'accessoryRectangular', now: T(0, 23, 40) });
   check('TILT 23:40 の次は翌日 0:00', r.w.refreshAfterDate.getTime() === new FDate(2026, 9, 6, 0, 0, 5).getTime());
-  const tiltImg = x => x.w.children[0].children.find(c => c.kind === 'image').src;
   const left = tiltImg(r), right = tiltImg(await run({ file: 'tilt-clock-widget.js', family: 'accessoryRectangular', now: T(0, 23, 40), param: '右' }));
   // 左：(x, y) = (v, 62 − u)／右：(150 − v, u) なので、右のドットは左を 180 度回した位置にある
   const centers = (img, f) => img.ops.map(o => f(o.r.x + o.r.width / 2, o.r.y + o.r.height / 2).map(n => n.toFixed(2)).join(',') + (o.c.alpha > .5 ? '#' : '.')).sort().join(' ');
@@ -184,7 +190,7 @@ const CASES = {
   const inside = img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= img.size.width + 0.01 && o.r.y + o.r.height <= img.size.height + 0.01);
   let allIn = true;
   for (const [h, m] of [[0, 5], [7, 40], [11, 40], [19, 10], [23, 40]]) for (const fam of ['accessoryRectangular', 'accessoryCircular', 'small'])
-    for (const param of ['', '右']) allIn = allIn && inside(tiltImg(await run({ file: 'tilt-clock-widget.js', family: fam, now: T(0, h, m), param })));
+    for (const param of ['', '右', '時刻', '半,右']) allIn = allIn && inside(tiltImg(await run({ file: 'tilt-clock-widget.js', family: fam, now: T(0, h, m), param })));
   check('TILT どの時刻・形・向きでもドットが枠の中に収まる', allIn && left.size.width === 150 && left.size.height === 62);
 
   // ---------- タップ領域の分割 ----------
