@@ -44,8 +44,12 @@ const PARAMS = String(args.widgetParameter || "")
   .split(/[,、]/).map(s => s.trim()).filter(Boolean);
 const THEME = PARAMS.map(p => p.toLowerCase()).find(p => p === "dark" || p === "light") || CONFIG.theme;
 // 「だけ」：砂時計だけを枠いっぱいに横倒しで描く（向きの指定がなければ左）
-const ONLY = PARAMS.some(p => /^(だけ|only)$/i.test(p));
-const TURN = PARAMS.some(p => /^(右|right)$/i.test(p)) ? "right" : PARAMS.some(p => /^(左|left)$/i.test(p)) || ONLY ? "left" : null;
+let ONLY = false, TURN = null;
+function applyParams(list) {
+  ONLY = list.some(p => /^(だけ|only)$/i.test(p));
+  TURN = list.some(p => /^(右|right)$/i.test(p)) ? "right" : list.some(p => /^(左|left)$/i.test(p)) || ONLY ? "left" : null;
+}
+applyParams(PARAMS);
 
 // ---------- 色（Nothing デザインテンプレ：白基調） ----------
 const PALETTES = {
@@ -88,9 +92,13 @@ const GLYPHS = {
 // ============================================================
 // ウィジェット本体
 // ============================================================
-async function makeWidget(family) {
+async function makeWidget(family, sample) {
   const now = new Date();
-  const S = stateAt(await loadState(), now);
+  let S = stateAt(await loadState(), now);
+  // アプリ内プレビューで止まっているときは、見本（6 時間のうち 2 時間たった状態）で見せる
+  if (sample && S.mode === "idle") {
+    S = stateAt({ start: new Date(now.getTime() - 2 * 3600000), end: new Date(now.getTime() + 4 * 3600000), label: "見本" }, now);
+  }
   const w = new ListWidget();
   w.url = "shortcuts://run-shortcut?name=" + encodeURIComponent(CONFIG.shortcut);
   w.refreshAfterDate = nextRefresh(S, now);
@@ -448,6 +456,20 @@ async function preview(w, family) {
   else await w.presentSmall();
 }
 
+// プレビューに使う Parameter（ウィジェットに入れる値と同じ）。▶ のプレビューには Parameter が渡らないため
+async function chooseParam() {
+  const opts = ["なし（普通の向き）", "左", "右", "だけ", "だけ,右"];
+  const a = new Alert();
+  a.title = "Parameter を選んでプレビュー";
+  a.message = "ウィジェットの Parameter に入れる値と同じです。";
+  opts.forEach(o => a.addAction(o));
+  a.addCancelAction("キャンセル");
+  const i = await a.presentSheet();
+  if (i < 0) return false;
+  applyParams(i === 0 ? [] : opts[i].split(","));
+  return true;
+}
+
 async function chooseAction() {
   const opts = [["ショートカットで開始", "run"], ["ロック画面（長方形）", "accessoryRectangular"], ["ロック画面（円形）", "accessoryCircular"],
     ["小", "small"], ["中", "medium"], ["止める", "stop"]];
@@ -478,8 +500,8 @@ if (args.shortcutParameter !== undefined && args.shortcutParameter !== null && !
     a.message = "時計アプリのタイマーは、時計アプリで止めてください。";
     a.addAction("OK");
     await a.presentAlert();
-  } else if (family) {
-    const widget = await makeWidget(family);
+  } else if (family && (!config.runsInApp || await chooseParam())) {
+    const widget = await makeWidget(family, config.runsInApp);
     if (config.runsInApp) await preview(widget, family);
     else Script.setWidget(widget);
   }
