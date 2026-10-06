@@ -133,6 +133,10 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 - 並びは承認済みモック `design/nothing-white-v3.html` のアプリ 18 個。中の初期 8 個：CAL・TODO・NOTION・CLAUDE／STUDY・NOTES・MUSIC・CLOCK。アプリアイコンの方針どおり Notion と studymgr は黒地に白、Claude だけ赤
 - URL：`calshow:`（実行時に今日の秒数へ）、`x-apple-reminderkit://`、`notion://`、`claude://`、`goodnotes://`、`music://`、`clock-alarm://`、`photos-redirect://`、`App-prefs:`、`maps://`、`weather://`、`message://`、`x-apple-health://`、`itms-apps://`、`shareddocuments://`、`translate://`。**どれも実機未確認**。studymgr は `https://weekly-from3rd-party.github.io/StuMane/`（ユーザー確認済み）。丸ポップは URL が不明なので、ショートカット「丸ポップ」経由（`shortcuts://run-shortcut?name=`）
 - SF Symbols の名前が無い場合は `square` に置き換える
+- **セット**（2026-10-06 ユーザー依頼・承認済み）：複数の LAUNCHER ウィジェットにそれぞれ別の組み合わせを出すため、アプリの組み合わせを名前付きのセットにする。iCloud の `launcher/sets.json`（`[{ name, apps: [{ label, icon, url, style }] }]`）、無ければ `CONFIG.apps` を入れた「すべて」1 つ
+  - Parameter の数字・dark・透明 以外をセット名として読む（無い名前は最初のセット）。小のタップ先は `&launch=menu&set=セット名`
+  - ▶ →「アプリを編集」：セットの中を編集（追加＝`CATALOG` から選ぶか URL／ショートカット名を入力 → 表示名・アイコン `ICONS`・色）・変更・並べ替え・削除／セットを作る（空 or 複製）／名前を変える／削除（最後の 1 つは不可）／初期に戻す
+  - セット名に数字だけ・dark・light・透明・空は使えない。カンマは空白に。▶ のプレビューはセットが複数あれば選ぶ
 
 ## 5. デザイントークン
 

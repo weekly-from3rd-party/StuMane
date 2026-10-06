@@ -170,7 +170,7 @@ const CASES = {
   r = await run({ file: 'launcher-widget.js', family: 'extraLarge', pad: true, now: T(1, 10) });
   check('LAUNCHER 特大：18 個すべて', urls(r.w).length === 18);
   r = await run({ file: 'launcher-widget.js', family: 'small', now: T(1, 10), scriptName: 'ランチャー' });
-  check('LAUNCHER 小：タップで一覧を開く', urls(r.w).length === 0 && r.w.url.endsWith('&launch=menu'), r.w.url);
+  check('LAUNCHER 小：タップで一覧を開く（セット名つき）', urls(r.w).length === 0 && r.w.url.endsWith('&launch=menu&set=' + encodeURIComponent('すべて')), r.w.url);
   r = await run({ file: 'launcher-widget.js', app: true, now: T(1, 10), query: { launch: 'menu' }, sheets: [3] });
   check('LAUNCHER 一覧で選ぶとそのアプリを開く', r.log.includes('open claude://'), r.log.join(' | '));
 
@@ -245,6 +245,41 @@ const CASES = {
   check('HOURGLASS「だけ」：砂は上下合わせて 39 粒・落ちている砂粒だけ赤', sandLit(onlyHome) === 39 && onlyHome.ops.filter(o => o.c.hex === '#ff3b30').length === 1, String(sandLit(onlyHome)));
   check('HOURGLASS「だけ」：左と右は 180 度反対向き', ctr(only, (x, y) => [150 - x, 62 - y]) === ctr(onlyR, (x, y) => [x, y]));
   check('HOURGLASS 回した表示は枠の中に収まる', [only, onlyR].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)) && [tl, tr].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)));
+
+  // ---------- LAUNCHER のセット（▶ メニュー：0 アプリを開く / 1 アプリを編集 / 2 小 …）----------
+  const L = 'launcher-widget.js';
+  const lUrls = async (param, fam = 'medium') => urls((await run({ file: L, family: fam, now: T(1, 10), param })).w);
+  const ed = (sheets, texts, alerts) => run({ file: L, app: true, now: T(1, 10), sheets, texts, alerts });
+  reset();
+  await ed([1, 1, 0], ['勉強']);
+  check('LAUNCHER セットを作る（空）→ Parameter「勉強」は空、指定なしは「すべて」18 個', (await lUrls('勉強')).length === 0 && (await lUrls('', 'extraLarge')).length === 18);
+  await ed([1, 0, 1, 0, 3]);
+  await ed([1, 0, 1, 0, 0, 0, 4, 1], ['youtube://', 'yt']);
+  r = await run({ file: L, family: 'medium', now: T(1, 10), param: '勉強' });
+  t = dump(r.w);
+  check('LAUNCHER セットに一覧から追加・自分で追加（URL・表示名・アイコン・色）', urls(r.w).join(' ') === 'notion:// youtube://' && t.includes('"YT"') && t.includes('[SF star 19 #ffffff'), urls(r.w).join(' '));
+  await ed([1, 0, 1, 2, 1, 0]);
+  check('LAUNCHER セットの中を並べ替え（YT をいちばん前へ）', (await lUrls('勉強')).join(' ') === 'youtube:// notion://');
+  await ed([1, 2, 1], ['学校']);
+  check('LAUNCHER セットの名前を変える（勉強→学校。古い名前は最初のセットになる）', (await lUrls('学校')).length === 2 && (await lUrls('勉強')).length === 8);
+  r = await run({ file: L, family: 'small', now: T(1, 10), param: '学校', scriptName: 'L' });
+  check('LAUNCHER 小：タップ先にセット名', r.w.url === 'scriptable:///run?scriptName=L&launch=menu&set=' + encodeURIComponent('学校'), r.w.url);
+  r = await run({ file: L, app: true, now: T(1, 10), query: { launch: 'menu', set: '学校' }, sheets: [1] });
+  check('LAUNCHER 小のタップ → そのセットの一覧から開く', r.log.some(l => l.includes('アプリを開く（学校）')) && r.log.includes('open notion://'), r.log.join(' | '));
+  await ed([1, 0, 1, 3, 0]);
+  check('LAUNCHER セットからアプリを削除', (await lUrls('学校')).join(' ') === 'notion://');
+  r = await ed([1, 1], ['2']);
+  check('LAUNCHER 数字・dark・透明 はセット名に使えない', r.log.some(l => l.includes('使えない名前です')));
+  r = await ed([1, 1, 0], ['すべて']);
+  check('LAUNCHER 同じ名前のセットは作らない', r.log.some(l => l.includes('同じ名前があります')));
+  await ed([1, 1, 1], ['生活']);
+  check('LAUNCHER 今のセットを複製して作る', (await lUrls('生活', 'extraLarge')).length === 18);
+  await ed([1, 3, 1], [], [0, 0]);
+  check('LAUNCHER セットを削除（学校 → 最初のセットに戻る）', (await lUrls('学校')).length === 8 && (await lUrls('生活', 'extraLarge')).length === 18);
+  await ed([1, 4], [], [0, 0]);
+  check('LAUNCHER 初期に戻す', (await lUrls('生活', 'extraLarge')).length === 18 && (await lUrls('', 'extraLarge')).length === 18
+    && JSON.parse(FILES.get('/icloud/launcher/sets.json')).length === 1);
+  reset();
 
   // ---------- タップ領域の分割 ----------
   r = await run({ file: 'clock-widget.js', family: 'large', now: new FDate(2026, 9, 5, 10) });

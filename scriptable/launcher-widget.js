@@ -14,8 +14,14 @@
          Scriptable が開き、一覧から選んで開きます（2 タップ）
      ロック画面：対応しません
 
-   アプリの追加・並べ替え
-     下の CONFIG.apps を書き換えます。
+   アプリの組み合わせ（セット）
+     Scriptable で ▶ →「アプリを編集」で、名前付きのセット（例：勉強・生活）を
+     いくつでも作れます。セットごとにアプリの追加・変更・並べ替え・削除ができ、
+     iCloud（launcher/sets.json）に保存して iPhone と iPad で共有します。
+     ウィジェットの Parameter にセット名を入れると、そのセットが出ます。
+
+   最初のセット「すべて」の中身（初期に戻したときもこれ）
+     下の CONFIG.apps。書き換える場合の書き方：
        label … 表示名（英大文字 6 文字程度まで）
        icon  … SF Symbols の名前（「SF Symbols」アプリで探せます）
        url   … 開く URL（"calshow:" はカレンダーの今日）
@@ -24,10 +30,11 @@
      ショートカットを作り、url を "shortcuts://run-shortcut?name=名前" にします。
 
    ウィジェット設定の「Parameter」（任意・カンマ区切り）
+     勉強  … そのセットを表示（入れなければ最初のセット）
      2     … 2 ページ目（中は 9〜16 個目、大は 17〜32 個目）を表示
      dark  … 暗色テーマ（文字が白。暗い壁紙向け）
      透明  … 背景を透明に（設定方法は TODAY / TOMORROW と同じ）
-     例）透明,2
+     例）勉強,2　／　透明,生活
 
    アプリ内で ▶ 実行すると、アプリを開く・サイズを選んでプレビューができます。
    ============================================================ */
@@ -64,6 +71,8 @@ const PARAMS = String(args.widgetParameter || "")
 const THEME = PARAMS.map(p => p.toLowerCase()).find(p => p === "dark" || p === "light") || CONFIG.theme;
 const CLEAR = PARAMS.some(p => /^(透明|clear)$/i.test(p));
 const PAGE = Math.max(1, parseInt(PARAMS.find(p => /^\d+$/.test(p)) || "1", 10));
+// 数字・dark・透明 以外はセット名
+const SET_NAME = PARAMS.find(p => !/^\d+$/.test(p) && !/^(dark|light|透明|clear)$/i.test(p)) || "";
 
 // ---------- 色（Nothing デザインテンプレ：白基調） ----------
 const PALETTES = {
@@ -110,7 +119,7 @@ const GLYPHS = {
 // ============================================================
 // ウィジェット本体
 // ============================================================
-async function makeWidget(family) {
+async function makeWidget(family, setName) {
   const w = new ListWidget();
   w.spacing = 0;
   if (family.indexOf("accessory") === 0) {
@@ -127,20 +136,21 @@ async function makeWidget(family) {
   const now = new Date();
   w.refreshAfterDate = new Date(dayStart(now, 1).getTime() + 60 * 1000);   // 日付の見出しのため
 
+  const set = pickSet(await loadSets(), setName);
   const g = GRID[family] || GRID.medium;
   const per = g.cols * g.rows;
-  const apps = CONFIG.apps.slice((PAGE - 1) * per, PAGE * per);
+  const apps = set.apps.slice((PAGE - 1) * per, PAGE * per);
 
   if (family === "small") {
     w.setPadding(13, 14, 12, 14);
-    w.url = menuUrl();                  // 小は 1 か所しかタップできない → 一覧を開く
+    w.url = menuUrl(set.name);          // 小は 1 か所しかタップできない → 一覧を開く
     grid(w, apps, g, now, false);
     return w;
   }
   if (family === "large" || family === "extraLarge") {
     const pad = family === "large" ? [16, 16, 14, 16] : [18, 18, 16, 18];
     w.setPadding(...pad);
-    header(w, now, family === "large" ? 26 : 24);
+    header(w, now, family === "large" ? 26 : 24, set);
     w.addSpacer(12);
   } else {
     w.setPadding(12, 13, 11, 13);
@@ -150,14 +160,14 @@ async function makeWidget(family) {
   return w;
 }
 
-function header(w, now, dots) {
+function header(w, now, dots, set) {
   const h = hstack(w);
   h.centerAlignContent();
   addDots(h, md(now), dots, P.ink);
   h.addSpacer(10);
   addText(h, WEEK[now.getDay()], mono(11, "semibold"), P.ink);
   h.addSpacer();
-  const pages = Math.ceil(CONFIG.apps.length / (GRID.large.cols * GRID.large.rows));
+  const pages = Math.ceil(set.apps.length / (GRID.large.cols * GRID.large.rows));
   addText(h, pages > 1 ? "APPS " + PAGE + "/" + pages : "APPS", mono(10.5), P.faint);
 }
 
@@ -166,7 +176,7 @@ function grid(parent, apps, g, now, tap) {
   const box = vstack(parent);
   box.spacing = g.gap;
   if (!apps.length) {
-    addText(box, "このページにアプリはありません", sys(12), P.dim);
+    addText(box, "アプリがありません（▶ →「アプリを編集」で追加）", sys(12), P.dim).lineLimit = 2;
     return;
   }
   for (let i = 0; i < apps.length; i += g.cols) {
@@ -235,17 +245,274 @@ function appUrl(app, now) {
   return u === "calshow:" ? calshow(now) : u;
 }
 
-// 小サイズのタップ：このスクリプトを一覧つきで開く
-function menuUrl() {
+// 小サイズのタップ：このスクリプトを一覧つきで開く（どのセットかも渡す）
+function menuUrl(setName) {
   const base = URLScheme.forRunningScript();
-  return base + (base.indexOf("?") >= 0 ? "&" : "?") + "launch=menu";
+  return base + (base.indexOf("?") >= 0 ? "&" : "?") + "launch=menu&set=" + encodeURIComponent(setName);
 }
 
 // ▶ / 小サイズのタップから：一覧で選んで開く
-async function appMenu() {
-  const apps = CONFIG.apps.filter(a => a.url);
-  const i = await sheet("アプリを開く", apps.map(a => a.label));
+async function appMenu(setName) {
+  const set = pickSet(await loadSets(), setName);
+  const apps = set.apps.filter(a => a.url);
+  if (!apps.length) return notice("アプリがありません", "▶ →「アプリを編集」でセット「" + set.name + "」にアプリを追加してください。");
+  const i = await sheet("アプリを開く（" + set.name + "）", apps.map(a => a.label));
   if (i >= 0) Safari.open(appUrl(apps[i], new Date()));
+}
+
+// ============================================================
+// セット（iCloud の launcher/sets.json = [{ name, apps: [{ label, icon, url, style }] }]）
+// ============================================================
+const DEFAULT_SET = "すべて";
+
+// 追加するときに選べるアプリ（今の 18 個＋よく使うもの）
+const CATALOG = CONFIG.apps.concat([
+  { label: "MSG",    icon: "message",          url: "sms:" },
+  { label: "YT",     icon: "play.rectangle",   url: "youtube://" },
+  { label: "LINE",   icon: "bubble.left",      url: "line://" },
+  { label: "INSTA",  icon: "camera",           url: "instagram://" },
+  { label: "X",      icon: "at",               url: "twitter://" },
+  { label: "SPOT",   icon: "headphones",       url: "spotify://" },
+  { label: "GMAIL",  icon: "tray",             url: "googlegmail://" },
+  { label: "GMAPS",  icon: "map.circle",       url: "comgooglemaps://" },
+  { label: "CHROME", icon: "globe",            url: "googlechrome://" },
+  { label: "SLACK",  icon: "number",           url: "slack://" },
+  { label: "SHORT",  icon: "square.stack.3d.up", url: "shortcuts://" },
+]);
+// アイコンの候補（SF Symbols の名前は自分で入力もできる）
+const ICONS = ["square", "circle", "star", "heart", "book", "pencil", "doc.text", "folder", "calendar", "clock", "music.note",
+  "camera", "photo", "map", "cart", "bag", "gamecontroller", "graduationcap", "dumbbell", "fork.knife", "house", "globe", "sparkle"];
+
+function store() {
+  try {
+    return FileManager.iCloud();
+  } catch (e) {
+    return FileManager.local();
+  }
+}
+
+function setsPath(fm) {
+  return fm.joinPath(fm.joinPath(fm.documentsDirectory(), DIR), "sets.json");
+}
+
+function defaultSets() {
+  return [{ name: DEFAULT_SET, apps: CONFIG.apps.map(a => Object.assign({}, a)) }];
+}
+
+async function loadSets() {
+  const fm = store();
+  const p = setsPath(fm);
+  if (!fm.fileExists(p)) return defaultSets();
+  try {
+    await fm.downloadFileFromiCloud(p);
+    const sets = JSON.parse(fm.readString(p));
+    return Array.isArray(sets) && sets.length ? sets.filter(x => x && x.name && Array.isArray(x.apps)) : defaultSets();
+  } catch (e) {
+    return defaultSets();
+  }
+}
+
+function saveSets(sets) {
+  const fm = store();
+  const dir = fm.joinPath(fm.documentsDirectory(), DIR);
+  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+  fm.writeString(setsPath(fm), JSON.stringify(sets));
+}
+
+// 名前のセット（無ければ最初のセット）
+function pickSet(sets, name) {
+  return sets.find(x => x.name === name) || sets[0] || defaultSets()[0];
+}
+
+// ============================================================
+// ▶ →「アプリを編集」
+// ============================================================
+async function editMenu() {
+  const sets = await loadSets();
+  const ops = ["セットの中を編集", "セットを作る", "セットの名前を変える", "セットを削除する", "初期に戻す"];
+  const i = await sheet("アプリを編集（セット " + sets.length + " 個）", ops);
+  if (i === 0) {
+    const j = await pickSetIndex(sets, "編集するセット");
+    if (j >= 0) await editSet(sets, j);
+  } else if (i === 1) await createSet(sets);
+  else if (i === 2) await renameSet(sets);
+  else if (i === 3) await deleteSet(sets);
+  else if (i === 4) {
+    const a = new Alert();
+    a.title = "初期に戻しますか？";
+    a.message = "作ったセットはすべて消え、18 個が入った「" + DEFAULT_SET + "」だけになります。";
+    a.addDestructiveAction("初期に戻す");
+    a.addCancelAction("キャンセル");
+    if ((await a.presentAlert()) === 0) {
+      saveSets(defaultSets());
+      await notice("初期に戻しました", "セット「" + DEFAULT_SET + "」だけになりました。");
+    }
+  }
+}
+
+async function pickSetIndex(sets, title) {
+  if (sets.length === 1) return 0;
+  return sheet(title, sets.map(x => x.name + "（" + x.apps.length + " 個）"));
+}
+
+// 名前の入力（カンマは Parameter の区切り、数字・dark・透明 は別の意味があるので使えない）
+async function askText(title, message, text, placeholder) {
+  const a = new Alert();
+  a.title = title;
+  a.message = message;
+  a.addTextField(placeholder || "", text || "");
+  a.addAction("決定");
+  a.addCancelAction("キャンセル");
+  if ((await a.presentAlert()) !== 0) return null;
+  return String(a.textFieldValue(0) || "").trim();
+}
+
+async function askSetName(title, text, sets) {
+  const raw = await askText(title, "例：勉強、生活、朝。ウィジェットの Parameter にこの名前を入れて使います。", text, "セットの名前");
+  if (raw === null) return null;
+  const name = raw.replace(/[,、]/g, " ").replace(/\s+/g, " ").trim();
+  if (!name || /^\d+$/.test(name) || /^(dark|light|透明|clear)$/i.test(name)) {
+    await notice("使えない名前です", "空・数字だけ・dark・light・透明 は使えません。");
+    return null;
+  }
+  if (sets.some(x => x.name === name) && name !== text) {
+    await notice("同じ名前があります", "「" + name + "」はもうあります。");
+    return null;
+  }
+  return name;
+}
+
+async function createSet(sets) {
+  const name = await askSetName("セットを作る", "", sets);
+  if (!name) return;
+  const k = await sheet("中身", ["空のまま"].concat(sets.map(x => "「" + x.name + "」を複製")));
+  if (k < 0) return;
+  const apps = k === 0 ? [] : sets[k - 1].apps.map(a => Object.assign({}, a));
+  sets.push({ name, apps });
+  saveSets(sets);
+  await notice("セットを作りました", "「" + name + "」（" + apps.length + " 個）。ウィジェットの Parameter に「" + name + "」と入れると表示されます。");
+}
+
+async function renameSet(sets) {
+  const j = await pickSetIndex(sets, "名前を変えるセット");
+  if (j < 0) return;
+  const old = sets[j].name;
+  const name = await askSetName("セットの名前を変える", old, sets);
+  if (!name || name === old) return;
+  sets[j].name = name;
+  saveSets(sets);
+  await notice("名前を変えました", "「" + old + "」→「" + name + "」。このセットを出しているウィジェットの Parameter も「" + name + "」に直してください。");
+}
+
+async function deleteSet(sets) {
+  if (sets.length === 1) return notice("削除できません", "セットが 1 つしかありません。中身を変えるか、「初期に戻す」を使ってください。");
+  const j = await pickSetIndex(sets, "削除するセット");
+  if (j < 0) return;
+  const a = new Alert();
+  a.title = "「" + sets[j].name + "」を削除しますか？";
+  a.message = "このセットを出しているウィジェットは、最初のセットの表示になります。";
+  a.addDestructiveAction("削除する");
+  a.addCancelAction("キャンセル");
+  if ((await a.presentAlert()) !== 0) return;
+  const name = sets[j].name;
+  sets.splice(j, 1);
+  saveSets(sets);
+  await notice("削除しました", "セット「" + name + "」を削除しました。");
+}
+
+// セットの中のアプリ：追加・変更・並べ替え・削除
+async function editSet(sets, j) {
+  const set = sets[j];
+  const i = await sheet("「" + set.name + "」（" + set.apps.length + " 個）", ["アプリを追加", "アプリを変更", "並べ替える", "削除する"]);
+  if (i < 0) return;
+  if (i === 0) {
+    const app = await newApp();
+    if (!app) return;
+    set.apps.push(app);
+    saveSets(sets);
+    return notice("追加しました", "「" + app.label + "」を「" + set.name + "」のいちばん後ろに追加しました。");
+  }
+  if (!set.apps.length) return notice("アプリがありません", "先に「アプリを追加」してください。");
+  const k = await sheet(["", "変更するアプリ", "動かすアプリ", "削除するアプリ"][i], set.apps.map((a, n) => (n + 1) + ". " + a.label));
+  if (k < 0) return;
+  if (i === 1) {
+    if (await changeApp(set.apps[k])) saveSets(sets);
+  } else if (i === 2) {
+    const m = await sheet("「" + set.apps[k].label + "」を動かす", ["いちばん前へ", "1 つ前へ", "1 つ後ろへ", "いちばん後ろへ"]);
+    if (m < 0) return;
+    const [app] = set.apps.splice(k, 1);
+    const to = [0, Math.max(0, k - 1), Math.min(set.apps.length, k + 1), set.apps.length][m];
+    set.apps.splice(to, 0, app);
+    saveSets(sets);
+    await notice("並べ替えました", set.apps.map((a, n) => (n + 1) + ". " + a.label).join("\n"));
+  } else {
+    const label = set.apps[k].label;
+    set.apps.splice(k, 1);
+    saveSets(sets);
+    await notice("削除しました", "「" + label + "」を「" + set.name + "」から外しました。");
+  }
+}
+
+// 追加：一覧から選ぶか、自分で入れる
+async function newApp() {
+  const k = await sheet("追加するアプリ", ["自分で入れる（URL・ショートカット）"].concat(CATALOG.map(a => a.label + "　" + a.url)));
+  if (k < 0) return null;
+  if (k > 0) return Object.assign({}, CATALOG[k - 1]);
+  const app = { label: "APP", icon: "square", url: "" };
+  const how = await sheet("開く先", ["URL を入力する", "ショートカットを開く（名前を入力）"]);
+  if (how < 0) return null;
+  if (how === 0) {
+    const url = await askText("開く URL", "例：notion:// 、https://… 。アプリの URL は「アプリ名 URL スキーム」で検索すると見つかります。", "", "URL");
+    if (!url) return null;
+    app.url = url;
+  } else {
+    const name = await askText("ショートカットの名前", "ショートカットアプリで「App を開く」だけのショートカットを作り、その名前を入れます。", "", "ショートカット名");
+    if (!name) return null;
+    app.url = "shortcuts://run-shortcut?name=" + encodeURIComponent(name);
+  }
+  const label = await askText("表示名", "英大文字 6 文字くらいまでが収まります。", "", "例：NOTES");
+  if (label === null) return null;
+  app.label = (label || "APP").toUpperCase();
+  app.icon = await askIcon(app.icon);
+  app.style = await askStyle(app.style);
+  return app;
+}
+
+// 変更：表示名・開く先・アイコン・色
+async function changeApp(app) {
+  const i = await sheet("「" + app.label + "」を変更", ["表示名", "開く先（URL）", "アイコン", "色"]);
+  if (i < 0) return false;
+  if (i === 0) {
+    const t = await askText("表示名", "英大文字 6 文字くらいまでが収まります。", app.label, "表示名");
+    if (!t) return false;
+    app.label = t.toUpperCase();
+  } else if (i === 1) {
+    const t = await askText("開く URL", "ショートカットなら shortcuts://run-shortcut?name=名前", app.url, "URL");
+    if (!t) return false;
+    app.url = t;
+  } else if (i === 2) {
+    app.icon = await askIcon(app.icon);
+  } else {
+    app.style = await askStyle(app.style);
+  }
+  await notice("変更しました", app.label + "　" + app.url);
+  return true;
+}
+
+async function askIcon(current) {
+  const k = await sheet("アイコン（いま：" + current + "）", ["そのまま", "SF Symbols の名前を入力"].concat(ICONS));
+  if (k <= 0) return current;
+  if (k === 1) {
+    const t = await askText("SF Symbols の名前", "「SF Symbols」アプリで探せます。例：book.closed", current, "名前");
+    return t || current;
+  }
+  return ICONS[k - 2];
+}
+
+async function askStyle(current) {
+  const k = await sheet("色", ["白地に黒（ふつう）", "黒地に白", "赤（強調は 1 つだけがおすすめ）"]);
+  if (k < 0) return current;
+  return [undefined, "invert", "accent"][k];
 }
 
 // ============================================================
@@ -581,11 +848,18 @@ async function pickPhoto() {
 // アプリ内プレビュー
 // ============================================================
 async function chooseAction() {
-  const opts = [["アプリを開く", "menu"], ["小", "small"], ["中", "medium"], ["大", "large"]];
+  const opts = [["アプリを開く", "menu"], ["アプリを編集", "edit"], ["小", "small"], ["中", "medium"], ["大", "large"]];
   if (Device.isPad()) opts.push(["特大", "extraLarge"]);
   opts.push(["透明背景を設定", "setup-clear"]);
   const i = await sheet("プレビュー・設定", opts.map(o => o[0]));
   return i >= 0 ? opts[i][1] : null;
+}
+
+async function previewSetName() {
+  const sets = await loadSets();
+  if (sets.length === 1) return sets[0].name;
+  const i = await sheet("どのセット？", sets.map(x => x.name));
+  return i >= 0 ? sets[i].name : sets[0].name;
 }
 
 async function preview(w, family) {
@@ -603,15 +877,19 @@ async function preview(w, family) {
 // ============================================================
 // 実行（ファイルの最後に置くこと）
 // ============================================================
-// 小サイズのタップ（URL に launch=menu）なら一覧を出す
-const MENU = (args.queryParameters || {}).launch === "menu";
+// 小サイズのタップ（URL に launch=menu&set=セット名）なら一覧を出す
+const QUERY = args.queryParameters || {};
+const MENU = QUERY.launch === "menu";
 const family = MENU ? "menu" : config.widgetFamily || (config.runsInApp ? await chooseAction() : "medium");
 if (family === "menu") {
-  await appMenu();
+  await appMenu(MENU ? QUERY.set || "" : await previewSetName());
+} else if (family === "edit") {
+  await editMenu();
 } else if (family === "setup-clear") {
   await setupClear();
 } else if (family) {
-  const widget = await makeWidget(family);
+  // ▶ のプレビューには Parameter が渡らないので、セットが複数あれば選ぶ
+  const widget = await makeWidget(family, config.runsInApp ? await previewSetName() : SET_NAME);
   if (config.runsInApp) await preview(widget, family);
   else Script.setWidget(widget);
 }
