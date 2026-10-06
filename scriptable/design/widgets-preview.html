@@ -67,6 +67,12 @@ svg.dm { display: block; flex: none; }
 .lock .circ { width: 72px; height: 72px; border-radius: 50%; background: var(--ghost); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; flex: none; opacity: .9; }
 .lock .rect { width: 160px; height: 72px; display: flex; flex-direction: column; justify-content: center; gap: 1px; flex: none; opacity: .9; }
 .lock .rr { display: flex; align-items: center; gap: 4px; min-width: 0; }
+/* スタンバイ：充電中に横置きした iPhone。黒地に小サイズのウィジェットが 2 つ、拡大されて並ぶ */
+.standby-wrap { max-width: 100%; overflow-x: auto; }
+.standby { width: 640px; height: 296px; border-radius: 40px; background: #000; display: flex; align-items: center; justify-content: center; gap: 28px; flex: none; }
+.standby .zoom { width: 245px; height: 245px; flex: none; }
+.standby .zoom > .w { transform: scale(1.55); transform-origin: top left; }
+.btn { display: flex; align-items: center; justify-content: center; border-radius: 10px; flex: none; }
 .lock .na { font-size: 11px; color: var(--faint); text-align: center; }
 @media (max-width: 420px) { .page { padding-top: 24px; } h1 { font-size: 23px; } }
 </style>
@@ -74,7 +80,7 @@ svg.dm { display: block; flex: none; }
 <div class="page">
   <header class="top">
     <div class="eyebrow">SCRIPTABLE · NOTHING WHITE</div>
-    <h1>追加ウィジェット 5 本とロック画面のデザイン案</h1>
+    <h1>追加ウィジェットとロック画面・スタンバイのデザイン案</h1>
     <p class="lead">iPhone 標準機（393×852pt）の実寸です。見本データで、2026-10-06（火）10:30 時点の表示を再現しています。時計だけは今の時刻で動きます。端末がダークモードのときは、Parameter に <code>dark</code> を入れたときの暗色版で表示します。</p>
   </header>
   <div id="app"></div>
@@ -101,7 +107,7 @@ const G = {
   '4': ['00010','00110','01010','10010','11111','00010','00010'], '5': ['11111','10000','11110','00001','00001','10001','01110'],
   '6': ['00110','01000','10000','11110','10001','10001','01110'], '7': ['11111','00001','00010','00100','01000','01000','01000'],
   '8': ['01110','10001','10001','01110','10001','10001','01110'], '9': ['01110','10001','10001','01111','00001','00010','01100'],
-  '.': ['0','0','0','0','0','0','1'], '-': ['000','000','000','111','000','000','000'],
+  '.': ['0','0','0','0','0','0','1'], ':': ['0','0','1','0','1','0','0'], '-': ['000','000','000','111','000','000','000'],
 };
 function dots(text, h, color = C.ink) {
   const p = h / 7, d = p * .8, gl = [...String(text)].map(c => G[c] || G['-']);
@@ -253,12 +259,40 @@ const lock = [
   `<figure><div class="lock" style="justify-content:center;min-height:180px"><div class="na">LAUNCHER はロック画面に対応していません<br>（iOS の仕様でタップ先を 1 つしか持てないため）</div></div><figcaption>LAUNCHER</figcaption></figure>`,
 ];
 
+// ---------- TIMER（見本：25 分の FOCUS、残り 12:45 から動く） ----------
+const T0 = Date.now(), END = T0 + (12 * 60 + 45) * 1000, MIN = 25, HM = d => pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+const cnt = (size, w, c, align = 'left') => `<span class="tx cnt" style="font:${w} ${size}px var(--mono);color:${c};text-align:${align}">--:--</span>`;
+const doneMin = MIN - 13;   // 経過した分（12 分経過・13 分目が今）
+const tStates = Array.from({ length: MIN }, (_, i) => (i < doneMin ? 1 : i === doneMin ? 'a' : 0));
+const endLabel = '→ ' + HM(new Date(END));
+const timerSmall = `<div class="w s">` + row(tx('FOCUS', 10.5, { w: 600 }) + grow + tx('25MIN', 10.5, { c: C.dim })) + gap(6)
+  + cnt(30, 600, C.ink) + gap(2) + tx(endLabel, 10.5, { c: C.dim }) + grow
+  + dotRow(tStates.slice(0, 13), 9.5) + gap(2) + dotRow(tStates.slice(13), 9.5) + `</div>`;
+const clockStandby = `<div class="w s">` + live(null, 28, 600, C.ink) + gap(6)
+  + row(dots(md(today), 22) + gap(6) + tx(WEEK[today.getDay()], 10.5, { w: 600, c: C.dim })) + grow
+  + dotRow(hourStates(H).slice(0, 12), 10) + gap(2) + dotRow(hourStates(H).slice(12), 10) + `</div>`;
+const preset = (label, on) => `<div class="btn" style="width:52px;height:38px;background:${on ? C.ink : C.ghost}">${tx(label, 13, { w: 600, c: on ? 'var(--card)' : C.ink })}</div>`;
+const presets = cur => col(row(preset('5') + gap(8) + preset('10', cur === 10)) + gap(8) + row(preset('25', cur === 25) + gap(8) + preset('50')) + gap(8)
+  + `<div class="btn" style="width:112px;height:28px;border:1px solid var(--rule)">${tx(cur ? 'STOP' : 'MENU', 10.5, { w: 600, c: C.dim })}</div>`, 'flex:none');
+const timer = [
+  `<figure><div class="standby-wrap"><div class="standby"><div class="zoom">${clockStandby}</div><div class="zoom">${timerSmall}</div></div></div><figcaption>スタンバイ（充電中に横置き）· 左 CLOCK「スタンバイ」／右 TIMER</figcaption></figure>`,
+  W('m', row(col(row(tx('FOCUS', 10, { w: 600 }) + gap(8) + tx('25MIN', 10, { c: C.dim })) + gap(4) + cnt(34, 600, C.ink) + gap(2) + tx(endLabel, 10.5, { c: C.dim }) + grow
+      + dotRow(tStates, 6), 'width:150px;flex:none;align-self:stretch') + gap(12) + ruleV + gap(12) + presets(25), 'align-items:flex-start;flex:1'), '中 · 動いているとき（ボタンで開始・停止）'),
+  W('m', row(col(tx('READY', 10, { w: 600, c: C.dim }) + gap(6) + dots('25:00', 30) + grow + tx('前回 FOCUS 25MIN', 10.5, { c: C.faint }), 'width:150px;flex:none;align-self:stretch')
+      + gap(12) + ruleV + gap(12) + presets(0), 'align-items:flex-start;flex:1'), '中 · 止まっているとき'),
+  W('s', row(tx('DONE', 10.5, { w: 600, c: C.acc }) + grow + tx('25MIN', 10.5, { c: C.dim })) + gap(6) + dots('00:00', 24) + gap(6)
+    + tx('10:42 に終了', 12, { w: 500, sys: 1 }) + grow + ruleH + gap(5) + row(tx('TAP', 9, { w: 600, c: C.dim }) + grow + tx('もう一度はじめる', 11, { w: 500, sys: 1, c: C.dim })), '小 · 終わったとき（通知と音も）'),
+  `<figure><div class="lock"><div class="inline">TIMER ${HM(new Date(END))} まで</div><div class="bigtime">10:30</div><div class="slots"><div class="circ">${tx('FOCUS', 10, { w: 600, sys: 1 })}${cnt(15, 600, C.ink, 'center')}</div>`
+    + `<div class="rect">${row(tx('FOCUS', 12, { w: 600 }) + grow + tx(endLabel, 12, { w: 500 }))}${cnt(24, 600, C.ink)}</div></div></div><figcaption>ロック画面 · インライン／円形／長方形</figcaption></figure>`,
+];
+
 document.getElementById('app').outerHTML = `<div style="display:flex;flex-direction:column;gap:48px">${[
   section('COUNTDOWN', '残り時間＋カウントダウン。赤は最も近い 1 件', countdown),
   section('TODO', 'iOS リマインダーの今日のやること。赤は最も急ぐ 1 件', todo),
   section('HABIT', '習慣トラッカー。赤い輪は今日まだの習慣（上の 1 つ）', habit),
   section('CLOCK', '時刻と世界時計は秒まで動く。赤は今の時間の点', clock),
   section('LAUNCHER', '1 つのウィジェットから複数のアプリ。黒地は Notion と studymgr、赤は Claude だけ', launcher),
+  section('TIMER / STANDBY', '案：Scriptable のタイマーと、CLOCK のスタンバイ版。数字は秒まで動く。赤は進み具合の今の位置', timer),
   section('LOCK SCREEN', 'ロック画面用（インライン＝時計の上の 1 行／円形／長方形）。iOS が単色で描くので赤は出ない', lock),
 ].join('')}</div>`;
 
@@ -270,6 +304,8 @@ function wall(tz) {
   return [p.hour % 24, p.minute, p.second];
 }
 function tick() {
+  const left = Math.max(0, Math.round((END - Date.now()) / 1000));
+  document.querySelectorAll('.cnt').forEach(el => { el.textContent = Math.floor(left / 60) + ':' + pad2(left % 60); });
   document.querySelectorAll('.clk').forEach(el => {
     const [h, m, s] = wall(el.dataset.tz);
     el.textContent = (h === 0 ? 24 : h) + ':' + pad2(m) + ':' + pad2(s);
