@@ -10,7 +10,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 
 - 動作環境：iOS アプリ **Scriptable**（JavaScript でウィジェットを書けるアプリ）
 - 成果物：ウィジェットごとに **1 ファイル**。ユーザーが Scriptable に全文を貼り付けて使う
-  - `today-tomorrow-widget.js`（カレンダー）／`countdown-widget.js`（残り時間＋カウントダウン）／`todo-widget.js`（リマインダー）／`habit-widget.js`（習慣トラッカー）／`clock-widget.js`（時計・世界時計）
+  - `today-tomorrow-widget.js`（カレンダー）／`countdown-widget.js`（残り時間＋カウントダウン）／`todo-widget.js`（リマインダー）／`habit-widget.js`（習慣トラッカー）／`clock-widget.js`（時計・世界時計）／`launcher-widget.js`（アプリランチャー）
 - 全体の目的：待受（ロック画面）・ホーム画面・アプリアイコン・ウィジェットを、同じデザイン言語で一から作り直すこと。ウィジェットはその一部
 
 ## 2. ユーザーが明示したルール
@@ -32,7 +32,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 |---|---|
 | 待受（ロック画面）背景 | 完了：`assets/wallpaper/` に iPhone 用 1290×2796・iPad 用 1668×2388 |
 | ウィジェット | 完了：小・中・大・特大（iPad）・ロック画面 3 種、透明背景、暗色、カレンダー絞り込み。ユーザーが実機で使用中 |
-| 追加ウィジェット 4 本 | 作成済み・**実機未確認**（2026-10-05）：COUNTDOWN / TODO / HABIT / CLOCK。仕様は 4.5 章 |
+| 追加ウィジェット 5 本 | 作成済み・**実機未確認**（2026-10-05〜06）：COUNTDOWN / TODO / HABIT / CLOCK / LAUNCHER。仕様は 4.5 章 |
 | 音楽（再生中のジャケット） | 見送り（2026-10-05）。Apple Music はショートカット自動化か Last.fm 経由でしか取れず、ユーザーが今回は不要と判断 |
 | アプリアイコン | **未完了**：`design/nothing-white-v3.html` に線画グリフのモックがあるだけ。PNG の書き出しは未着手 |
 
@@ -94,7 +94,19 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 - 更新は 1 時間ごと（今の時間の赤い点・日付のため）。30 分単位の時差の都市があれば 30 分ごと
 - 小：曜日・日付／時刻 26pt／2 都市目／24 時間の点（12×2）。中：左に時刻 30pt・24 時間の点・ドット日付、右に世界時計 2 都市と TODAY / MONTH の点バー。大：ドット日付・時刻 44pt・24H 欄・WORLD 欄 3 都市。特大：時刻と 24H｜WORLD 6 都市
 - ロック画面：長方形は世界時計 3 行、円形は 2 都市目、インラインは時差だけ（インラインで時刻が進むか未確認のため）
-- タップで `clock-alarm://`（`CONFIG.open` で worldclock / timer / stopwatch）。**Apple の非公式 URL** なので iOS の更新で開かなくなる可能性あり
+- タップ：小・ロック画面は `clock-alarm://`（`CONFIG.open` で worldclock / timer / stopwatch）。中・大・特大は場所で分ける（時刻→アラーム／24H→タイマー／世界時計→世界時計）。**Apple の非公式 URL** なので iOS の更新で開かなくなる可能性あり
+
+### タップ領域の分割（2026-10-06・ユーザー承認済み）
+- 小とロック画面は iOS の仕様でウィジェット全体に 1 つの URL しか持てない。中・大・特大はスタックごとに `url` を持てる
+- TODO：明日の区切り・行・欄 → `calshow:` の明日（今日はリマインダー）。COUNTDOWN：今年の残り・REMAINING 欄 → `calshow:` の今日（カウントダウンの行はその日）
+
+### LAUNCHER（`launcher-widget.js`）
+- 1 つのウィジェットに複数のアプリ。タイル（SF Symbols の線画・Light、角丸の地、英字ラベル）ごとに `url`
+- 中 4×2=8／大 4×4=16（ドット日付の見出し・`APPS 1/2`）／特大 8×3=24。Parameter の数字でページ切り替え（中 8 個・大 16 個ずつ）
+- 小は 1 か所しかタップできないので、`URLScheme.forRunningScript()&launch=menu` で Scriptable を開き、一覧から `Safari.open(url)`（2 タップ）。ロック画面は非対応の案内のみ
+- 並びは承認済みモック `design/nothing-white-v3.html` のアプリ 18 個。中の初期 8 個：CAL・TODO・NOTION・CLAUDE／STUDY・NOTES・MUSIC・CLOCK。アプリアイコンの方針どおり Notion と studymgr は黒地に白、Claude だけ赤
+- URL：`calshow:`（実行時に今日の秒数へ）、`x-apple-reminderkit://`、`notion://`、`claude://`、`goodnotes://`、`music://`、`clock-alarm://`、`photos-redirect://`、`App-prefs:`、`maps://`、`weather://`、`message://`、`x-apple-health://`、`itms-apps://`、`shareddocuments://`、`translate://`。**どれも実機未確認**。studymgr は GitHub Pages の URL を仮置き（実際の URL をユーザーに確認すること）。丸ポップは URL が不明なので、ショートカット「丸ポップ」経由（`shortcuts://run-shortcut?name=`）
+- SF Symbols の名前が無い場合は `square` に置き換える
 
 ## 5. デザイントークン
 
@@ -134,13 +146,14 @@ countdown-widget.js           残り時間＋カウントダウン
 todo-widget.js                リマインダーの今日のやること
 habit-widget.js               習慣トラッカー
 clock-widget.js               時計・世界時計
+launcher-widget.js            アプリランチャー
 CLAUDE.md                     この文書
 package.json                  npm test / npm run dump
 test/harness.js               Scriptable API の模擬環境（型・プロパティ名の検査つき）
 test/data.js                  テスト用の予定データ
 test/fit.js                   機種別の収まり検査
 test/regress.js               回帰テスト
-test/widgets.js               追加 4 本の収まり検査と回帰テスト
+test/widgets.js               追加 5 本の収まり検査と回帰テスト
 test/dump.js                  ウィジェットの中身をツリー表示（デバッグ用）
 assets/wallpaper/             待受背景 PNG（iPhone・iPad）
 design/nothing-white-v3.html  承認済みモック（ロック／ホーム画面・アイコンの線画）
@@ -179,8 +192,8 @@ iOS はウィジェットを本当に透明にできないので、ウィジェ�
 Scriptable はパソコンで動かないため、`test/harness.js` に Scriptable API の模擬環境を用意してある。Node.js 18 以上で動く（追加のインストールは不要）。
 
 - `npm test` は `test/fit.js`・`test/regress.js`・`test/widgets.js` を実行する。失敗すると終了コード 1
-- `widgets.js`：追加 4 本を 5 機種 × 全サイズ（ロック画面含む）× ケースで収まり検査し、残り日数・毎年の日付・並び順・LATE・連続日数・タップでの記録／取り消し・過去の修正を確かめる
-- `harness.js` の `run({ file })` で対象ファイルを選ぶ。リマインダー（`reminders` / `remFail`）、iCloud ファイル、`queryParameters`（`query`）、`URLScheme` の模擬あり。収まりの見積もり `H` / `W` と機種表 `DEV` も harness にある
+- `widgets.js`：追加 5 本を 5 機種 × 全サイズ（ロック画面含む）× ケースで収まり検査し、残り日数・毎年の日付・並び順・LATE・連続日数・タップでの記録／取り消し・過去の修正を確かめる
+- `harness.js` の `run({ file })` で対象ファイルを選ぶ。リマインダー（`reminders` / `remFail`）、iCloud ファイル、`queryParameters`（`query`）、`URLScheme`、`WidgetDate`（`addDate`）、`SFSymbol`、`Safari.open` の模擬あり。URL は「スキーム:」で始まり空白がなければ通す（calshow は秒数、scriptable は run?scriptName= の形を検査）。収まりの見積もり `H` / `W` と機種表 `DEV` も harness にある
 - `fit.js`：5 機種 × 全サイズ × 8 ケース（通常・今日 1 件・夜・予定過多・長文・空・権限なし・透明未設定）で、高さと省略できない幅が枠に収まるかを見積もる
 - `regress.js`：透明背景の検出がピクセル単位で一致するか（色ずれ・角丸・紫やマゼンタ系アイコンを含む合成スクショ）、絞り込み、時刻表記、アプリ内プレビュー
 - `node test/dump.js medium ONE 16:00`：ウィジェットの中身をツリー表示する（引数はサイズ・データ・時刻・Parameter）
@@ -202,7 +215,7 @@ Scriptable はパソコンで動かないため、`test/harness.js` に Scriptab
 
 ## 9. 技術的な落とし穴（同じ失敗を繰り返さないため）
 
-- **共通部はコピー。** 「描画・小道具」〜「透明背景」の節は COUNTDOWN / TODO / HABIT / CLOCK で同一（TODAY / TOMORROW ともドット文字・透明背景の処理は同じ）。直すときは全ファイルに反映する
+- **共通部はコピー。** 「描画・小道具」〜「透明背景」の節は COUNTDOWN / TODO / HABIT / CLOCK / LAUNCHER で同一（TODAY / TOMORROW ともドット文字・透明背景の処理は同じ）。直すときは全ファイルに反映する
 - 横並びのスタックの中で、幅を空けるための固定スペーサーは `fit` の見積もりで高さとして数えられる。大きな幅を空けるときは `Size(幅, 0)` の空スタックを使う
 - **1 ファイル厳守。** `import` / `require` / npm パッケージは使えない（Scriptable に貼るため）。Node の API も使えない
 - **実行部はファイルの最後。** トップレベル await で動くので、途中に置くと後ろの `const`（`GLYPHS` など）が未初期化のままエラーになる

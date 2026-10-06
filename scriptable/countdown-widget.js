@@ -232,6 +232,7 @@ function buildMedium(w, D) {
   const y = period(D, "YEAR");
   const dc = vstack(main);
   dc.size = new Size(64, 0);
+  dc.url = calshow(D.now);              // 今年の残り → カレンダーの今日
   leftLine(dc, r => addText(r, String(D.now.getFullYear()), mono(10, "semibold"), P.ink));
   dc.addSpacer(4);
   leftLine(dc, r => addDots(r, String(y.left), 24, P.ink));
@@ -326,6 +327,7 @@ function buildExtraLarge(w, D) {
 // 見出し「REMAINING」＋残り時間 4 行。使った高さを返す
 function addPeriodSection(parent, D, b) {
   const sec = vstack(parent);
+  sec.url = calshow(D.now);             // 残り時間の欄 → カレンダーの今日
   sectionHead(sec, "REMAINING", "");
   const box = vstack(sec);
   box.spacing = BAR_GAP;

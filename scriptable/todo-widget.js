@@ -211,14 +211,16 @@ function buildMedium(w, D) {
   }
   const rest = budget - used - GAP;
   if (!more && D.tomorrow.length && rest >= SEP_H + GAP + rowHeight(s)) {
+    const tmrUrl = calshow(D.tomorrowStart);   // 明日の分はカレンダーの明日を開く
     const sep = hstack(col);
     sep.centerAlignContent();
+    sep.url = tmrUrl;
     addText(sep, "TOMORROW", mono(10, "semibold"), P.dim);
     sep.addSpacer(6);
     addText(sep, md(D.tomorrowStart) + " " + WEEK[D.tomorrowStart.getDay()], mono(10), P.dim);
     sep.addSpacer();
     addText(sep, D.tomorrow.length + "件", mono(10), P.faint);
-    fitList(D.tomorrow, rest - SEP_H - GAP, s, true).shown.forEach(it => addTodoRow(col, it, s));
+    fitList(D.tomorrow, rest - SEP_H - GAP, s, true).shown.forEach(it => { addTodoRow(col, it, s).url = tmrUrl; });
   }
 }
 
@@ -246,7 +248,7 @@ function buildLarge(w, D) {
     w.addSpacer(SEC_GAP);
     const m = fitList(D.tomorrow, rest, s);
     addSection(w, "TOMORROW", D.tomorrow.length ? D.tomorrow.length + "件" : "", D.tomorrow.length ? m : null, "やることなし", s,
-      md(D.tomorrowStart) + " " + WEEK[D.tomorrowStart.getDay()]);
+      md(D.tomorrowStart) + " " + WEEK[D.tomorrowStart.getDay()]).url = calshow(D.tomorrowStart);
   }
   w.addSpacer();
 }
@@ -270,6 +272,7 @@ function buildExtraLarge(w, D) {
       rule.addSpacer();
     }
     const col = vstack(main);
+    if (i) col.url = calshow(D.tomorrowStart);
     const h = hstack(col);
     h.centerAlignContent();
     addDots(h, count(c.list.length), 24, c.list.length ? P.ink : P.faint);
@@ -301,6 +304,7 @@ function addSection(parent, label, right, fit, empty, s, sub) {
   addRule(sec);
   sec.addSpacer(7);
   renderList(sec, fit, empty, s);
+  return sec;
 }
 
 function renderList(parent, fit, empty, s) {
@@ -381,6 +385,7 @@ function addTodoRow(parent, it, s) {
   addText(row, it.title, sys(s.titleSize, "medium"), P.ink);
   row.addSpacer();
   if (s.time && it.label) addText(row, it.label, mono(s.timeSize, "medium"), it.hl ? P.accent : it.late ? P.ink : P.dim);
+  return row;
 }
 
 // チェック前の丸

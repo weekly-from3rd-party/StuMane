@@ -27,7 +27,12 @@ class WidgetText { constructor(t) { if (typeof t !== 'string') throw new TypeErr
 class WidgetDate { constructor(d) { if (!(d instanceof Date)) throw new TypeError('addDate'); this.kind = 'date'; this.date = d; }
   applyTimerStyle() { this.style = 'timer'; } applyTimeStyle() { this.style = 'time'; } applyDateStyle() { this.style = 'date'; }
   applyRelativeStyle() { this.style = 'relative'; } applyOffsetStyle() { this.style = 'offset'; } leftAlignText() { this.align = 'left'; } centerAlignText() { this.align = 'center'; } rightAlignText() { this.align = 'right'; } }
-class WidgetImage { constructor(i) { if (!i || !i.__img) throw new TypeError('addImage'); this.kind = 'image'; } }
+class WidgetImage { constructor(i) { if (!i || !i.__img) throw new TypeError('addImage'); this.kind = 'image'; if (i.symbol) this.symbol = i.symbol; }
+  leftAlignImage() {} centerAlignImage() {} rightAlignImage() {} }
+const SF_WEIGHTS = ['UltraLight', 'Thin', 'Light', 'Regular', 'Medium', 'Semibold', 'Bold', 'Heavy', 'Black'];
+class SFSymbol { static named(n) { if (typeof n !== 'string' || !n) throw new TypeError('SFSymbol'); const s = new SFSymbol(); s.name = n; return s; }
+  get image() { return { __img: true, size: new Size(24, 24), symbol: this.name }; } applyFont(f) { if (!(f instanceof Font)) throw new TypeError('applyFont'); } }
+SF_WEIGHTS.forEach(w => { SFSymbol.prototype['apply' + w + 'Weight'] = function () {}; });
 class WidgetStack {
   constructor() { this.kind = 'stack'; this.dir = 'h'; this.children = []; }
   layoutHorizontally() { this.dir = 'h'; } layoutVertically() { this.dir = 'v'; } topAlignContent() {} centerAlignContent() {}
@@ -60,18 +65,23 @@ class WebView {
     });
   }
 }
-const ALLOW = { text: ['kind', 'text', 'font', 'textColor', 'textOpacity', 'lineLimit', 'minimumScaleFactor'],
-  date: ['kind', 'date', 'style', 'align', 'font', 'textColor', 'textOpacity', 'lineLimit', 'minimumScaleFactor', 'url'], image: ['kind', 'imageSize'], spacer: ['kind', 'length'],
+const ALLOW = { text: ['kind', 'text', 'font', 'textColor', 'textOpacity', 'lineLimit', 'minimumScaleFactor', 'url'],
+  date: ['kind', 'date', 'style', 'align', 'font', 'textColor', 'textOpacity', 'lineLimit', 'minimumScaleFactor', 'url'], image: ['kind', 'imageSize', 'symbol', 'tintColor', 'imageOpacity', 'url'], spacer: ['kind', 'length'],
   stack: ['kind', 'dir', 'children', 'padding', 'size', 'backgroundColor', 'spacing', 'url', 'cornerRadius'],
   widget: ['kind', 'dir', 'children', 'padding', 'backgroundColor', 'backgroundImage', 'spacing', 'url', 'refreshAfterDate', 'addAccessoryWidgetBackground'] };
+// URL：calshow は秒数、scriptable は run?scriptName=…&k=v、それ以外は「スキーム:」で始まり空白を含まない
+const okUrl = u => typeof u === 'string' && (/^calshow:\d+$/.test(u) || /^scriptable:\/\/\/run\?scriptName=[^&\s]+(&\w+=[^&\s]+)*$/.test(u)
+  || (/^(?!calshow:|scriptable:)[a-z][a-z0-9+.-]*:\S*$/i.test(u)));
 function validate(n, p = 'W') {
   const e = [], bad = m => e.push(p + ': ' + m);
   Object.keys(n).forEach(k => { if (!ALLOW[n.kind].includes(k)) bad('unknown prop ' + k); });
   if (n.kind === 'date') { if (!(n.font instanceof Font)) bad('font'); if (!n.style) bad('date style'); if (!n.align) bad('date align'); if (n.textColor !== undefined && !(n.textColor instanceof Color)) bad('color'); }
   if (n.kind === 'text') { if (!(n.font instanceof Font)) bad('font'); if (n.textColor !== undefined && !(n.textColor instanceof Color)) bad('color'); if (!Number.isInteger(n.lineLimit)) bad('lineLimit'); }
   if (n.kind === 'image' && !(n.imageSize instanceof Size)) bad('imageSize');
+  if (n.kind === 'image' && n.tintColor !== undefined && !(n.tintColor instanceof Color)) bad('tint');
+  if (n.kind !== 'stack' && n.kind !== 'widget' && n.url !== undefined && !okUrl(n.url)) bad('url ' + n.url);
   if (n.children) { if (n.size !== undefined && !(n.size instanceof Size)) bad('size'); if (n.backgroundColor !== undefined && !(n.backgroundColor instanceof Color)) bad('bg');
-    if (n.url !== undefined && !/^(calshow:\d+|x-apple-reminderkit:\/\/|scriptable:\/\/\/run\?scriptName=[^&\s]+(&\w+=[^&\s]+)*|clock-(alarm|worldclock|timer|stopwatch):\/\/)$/.test(n.url)) bad('url ' + n.url); if (n.refreshAfterDate !== undefined && !(n.refreshAfterDate instanceof Date)) bad('refresh');
+    if (n.url !== undefined && !okUrl(n.url)) bad('url ' + n.url); if (n.refreshAfterDate !== undefined && !(n.refreshAfterDate instanceof Date)) bad('refresh');
     n.children.forEach((c, i) => e.push(...validate(c, p + '/' + i))); }
   return e;
 }
@@ -80,10 +90,10 @@ const timerText = n => { const t = Math.max(0, Math.floor((FIXED - n.date.getTim
 function dump(n, ind = '') {
   if (n.kind === 'date') return ind + `{${n.style === 'timer' ? timerText(n) : n.style} ${n.font.name.replace('SystemFont', '').replace('Monospaced', 'Mono')} ${n.font.size}${n.textColor ? ' ' + n.textColor : ''}}\n`;
   if (n.kind === 'text') return n.text === '' ? '' : ind + `"${n.text}"  <${n.font.name.replace('SystemFont', '').replace('Monospaced', 'Mono')} ${n.font.size}${n.textColor ? ' ' + n.textColor : ''}>\n`;
-  if (n.kind === 'image') return ind + `[DOT ${n.imageSize.width.toFixed(1)}x${n.imageSize.height}]\n`;
+  if (n.kind === 'image') return ind + (n.symbol ? `[SF ${n.symbol} ${n.imageSize.width}${n.tintColor ? ' ' + n.tintColor : ''}${n.url ? ' → ' + n.url : ''}]\n` : `[DOT ${n.imageSize.width.toFixed(1)}x${n.imageSize.height}]\n`);
   if (n.kind === 'spacer') return '';
   if (n.size && n.size.width === 6 && n.size.height === 6) return ind + `(${n.backgroundColor.alpha ? '●RED' : '·'})\n`;
-  let s = ind + (n.kind === 'widget' ? 'WIDGET' : n.dir === 'h' ? 'H' : 'V') + (n.size ? ` ${n.size.width}x${n.size.height}` : '') + '\n';
+  let s = ind + (n.kind === 'widget' ? 'WIDGET' : n.dir === 'h' ? 'H' : 'V') + (n.size ? ` ${n.size.width}x${n.size.height}` : '') + (n.backgroundColor && n.kind !== 'widget' && n.cornerRadius ? ' bg' + n.backgroundColor : '') + (n.url ? ' → ' + n.url : '') + '\n';
   n.children.forEach(c => s += dump(c, ind + '  ')); return s;
 }
 async function run(o) {
@@ -105,7 +115,8 @@ async function run(o) {
     allIncomplete: async c => rems().filter(r => !r.isCompleted && inCals(r, c)) };
   const Calendar = { forRemindersByTitle: async t => { if (rems().some(r => r.calendar.title === t)) return { title: t }; throw new Error('no list ' + t); } };
   const scr = o.pad ? [834, 1194] : (o.screen || [393, 852]);
-  const ctx = vm.createContext({ Date: FDate, Color, Size, Rect, Point, Font, DrawContext, ListWidget, Alert, FileManager, Data, WebView, console, Reminder, Calendar,
+  const ctx = vm.createContext({ Date: FDate, Color, Size, Rect, Point, Font, DrawContext, ListWidget, Alert, FileManager, Data, WebView, console, Reminder, Calendar, SFSymbol,
+    Safari: { open: u => { if (!okUrl(u)) throw new TypeError('Safari.open ' + u); log.push('open ' + u); } },
     URLScheme: { forRunningScript: () => 'scriptable:///run?scriptName=' + encodeURIComponent(o.scriptName || 'Widget') },
     Photos: { fromLibrary: () => photos.length ? Promise.resolve(photos.shift()) : Promise.reject(new Error('cancel')) },
     CalendarEvent: { between: async (s, e) => { if (o.fail) throw new Error('denied'); return (o.events || []).filter(v => v.endDate > s && v.startDate < e); } },

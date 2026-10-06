@@ -1,66 +1,69 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
-// icon-color: deep-gray; icon-glyph: clock;
+// icon-color: deep-gray; icon-glyph: th-large;
 
 /* ============================================================
-   CLOCK ― Nothing 白基調 時計ウィジェット
+   LAUNCHER ― Nothing 白基調 アプリランチャーウィジェット
    ------------------------------------------------------------
-   時刻（秒まで）・日付・1 日の 24 時間・世界時計を表示します
-   （Scriptable 用）。タップで iOS の時計アプリを開きます。
-
-   時刻の進み方
-     iOS で自動的に進むのは「タイマー表示」だけなので、午前 0 時からの
-     経過時間を表示して時計にしています。そのため秒は常に表示されます。
-     0 時台は「24:30:15」のように表示します。
+   1 つのウィジェットに複数のアプリを並べ、タップした場所の
+   アプリを開きます（Scriptable 用）。
 
    対応サイズ
-     ホーム画面：小 / 中 / 大 / 特大（iPad）
-     ロック画面：長方形（世界時計）/ 円形（2 都市目）/ インライン（時差）
+     中：8 個 / 大：16 個 / 特大（iPad）：24 個
+     小：iOS の仕様で 1 か所しかタップできないため、タップすると
+         Scriptable が開き、一覧から選んで開きます（2 タップ）
+     ロック画面：対応しません
+
+   アプリの追加・並べ替え
+     下の CONFIG.apps を書き換えます。
+       label … 表示名（英大文字 6 文字程度まで）
+       icon  … SF Symbols の名前（「SF Symbols」アプリで探せます）
+       url   … 開く URL（"calshow:" はカレンダーの今日）
+       style … "invert"（黒地に白）/ "accent"（赤）/ 省略（白地に黒）
+     URL で開けないアプリは、ショートカットアプリで「App を開く」だけの
+     ショートカットを作り、url を "shortcuts://run-shortcut?name=名前" にします。
 
    ウィジェット設定の「Parameter」（任意・カンマ区切り）
-     ロンドン,パリ … 表示する都市（下の CITIES にある名前）
-     dark          … 暗色テーマ（文字が白。暗い壁紙向け）
-     透明          … 背景を透明に（設定方法は TODAY / TOMORROW と同じ）
-     例）透明,ニューヨーク
+     2     … 2 ページ目（中は 9〜16 個目、大は 17〜32 個目）を表示
+     dark  … 暗色テーマ（文字が白。暗い壁紙向け）
+     透明  … 背景を透明に（設定方法は TODAY / TOMORROW と同じ）
+     例）透明,2
 
-   アプリ内で ▶ 実行すると、サイズを選んでプレビューできます。
+   アプリ内で ▶ 実行すると、アプリを開く・サイズを選んでプレビューができます。
    ============================================================ */
 
 // ---------- 設定 ----------
 const CONFIG = {
-  theme: "light",                                     // "light"（白基調・既定）/ "dark"
-  home: "TOKYO",                                      // この端末の時刻につける名前
-  cities: ["ロンドン", "ニューヨーク", "ロサンゼルス"],   // 世界時計（CITIES の名前か { label, tz }）
-  open: "alarm",                                      // タップで開く画面：alarm / worldclock / timer / stopwatch
+  theme: "light",   // "light"（白基調・既定）/ "dark"
+  apps: [
+    { label: "CAL",    icon: "calendar",           url: "calshow:" },
+    { label: "TODO",   icon: "checklist",          url: "x-apple-reminderkit://" },
+    { label: "NOTION", icon: "doc.text",           url: "notion://", style: "invert" },
+    { label: "CLAUDE", icon: "sparkle",            url: "claude://", style: "accent" },
+    { label: "STUDY",  icon: "graduationcap",      url: "https://weekly-from3rd-party.github.io/StuMane/", style: "invert" },  // studymgr の URL に変えてください
+    { label: "NOTES",  icon: "pencil.and.outline", url: "goodnotes://" },
+    { label: "MUSIC",  icon: "music.note",         url: "music://" },
+    { label: "CLOCK",  icon: "clock",              url: "clock-alarm://" },
+    { label: "PHOTO",  icon: "photo",              url: "photos-redirect://" },
+    { label: "SET",    icon: "gearshape",          url: "App-prefs:" },
+    { label: "MARU",   icon: "circle.circle",      url: "shortcuts://run-shortcut?name=" + encodeURIComponent("丸ポップ") },  // ショートカット「丸ポップ」を作る
+    { label: "MAPS",   icon: "map",                url: "maps://" },
+    { label: "WTHR",   icon: "cloud.sun",          url: "weather://" },
+    { label: "MAIL",   icon: "envelope",           url: "message://" },
+    { label: "HEALTH", icon: "heart",              url: "x-apple-health://" },
+    { label: "STORE",  icon: "bag",                url: "itms-apps://" },
+    { label: "FILES",  icon: "folder",             url: "shareddocuments://" },
+    { label: "TRANS",  icon: "character.bubble",   url: "translate://" },
+  ],
 };
-const DIR = "clock";   // 透明背景の保存先フォルダ
-
-// 都市名 → [表示名, タイムゾーン]
-const CITIES = {
-  "東京": ["TOKYO", "Asia/Tokyo"], "ソウル": ["SEOUL", "Asia/Seoul"], "上海": ["SHANGHAI", "Asia/Shanghai"],
-  "台北": ["TAIPEI", "Asia/Taipei"], "香港": ["HONG KONG", "Asia/Hong_Kong"], "シンガポール": ["SINGAPORE", "Asia/Singapore"],
-  "バンコク": ["BANGKOK", "Asia/Bangkok"], "デリー": ["DELHI", "Asia/Kolkata"], "ドバイ": ["DUBAI", "Asia/Dubai"],
-  "ロンドン": ["LONDON", "Europe/London"], "パリ": ["PARIS", "Europe/Paris"], "ベルリン": ["BERLIN", "Europe/Berlin"],
-  "ニューヨーク": ["NEW YORK", "America/New_York"], "シカゴ": ["CHICAGO", "America/Chicago"],
-  "ロサンゼルス": ["LOS ANGELES", "America/Los_Angeles"], "ホノルル": ["HONOLULU", "Pacific/Honolulu"],
-  "シドニー": ["SYDNEY", "Australia/Sydney"], "オークランド": ["AUCKLAND", "Pacific/Auckland"],
-};
+const DIR = "launcher";   // 透明背景の保存先フォルダ
 
 // ---------- パラメータ ----------
 const PARAMS = String(args.widgetParameter || "")
   .split(/[,、]/).map(s => s.trim()).filter(Boolean);
 const THEME = PARAMS.map(p => p.toLowerCase()).find(p => p === "dark" || p === "light") || CONFIG.theme;
 const CLEAR = PARAMS.some(p => /^(透明|clear)$/i.test(p));
-const ZONES = (() => {
-  const pick = PARAMS.filter(p => CITIES[p]);
-  return (pick.length ? pick : CONFIG.cities).map(c => {
-    if (typeof c === "string") return CITIES[c] ? { label: CITIES[c][0], tz: CITIES[c][1] } : null;
-    return c && c.tz ? { label: String(c.label || c.tz).toUpperCase(), tz: c.tz } : null;
-  }).filter(z => z && validZone(z.tz));
-})();
-const OPEN = "clock-" + ({ alarm: 1, worldclock: 1, timer: 1, stopwatch: 1 }[CONFIG.open] ? CONFIG.open : "alarm") + "://";
-// 中・大・特大は場所ごとに開く画面を分ける（小・ロック画面は OPEN だけ）
-const TAP = { time: "clock-alarm://", hours: "clock-timer://", world: "clock-worldclock://" };
+const PAGE = Math.max(1, parseInt(PARAMS.find(p => /^\d+$/.test(p)) || "1", 10));
 
 // ---------- 色（Nothing デザインテンプレ：白基調） ----------
 const PALETTES = {
@@ -78,7 +81,14 @@ const PALETTES = {
 const P = PALETTES[THEME] || PALETTES.light;
 
 const WEEK = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-const SEC_H = 27;   // 大サイズの見出し（ラベル＋罫線）
+
+// サイズ別の並び：列数・段数・アイコンの大きさ・タイルの幅・ラベル・段の間
+const GRID = {
+  small:      { cols: 2, rows: 2, icon: 40, tileW: 54, label: 9.5,  gap: 6 },
+  medium:     { cols: 4, rows: 2, icon: 38, tileW: 64, label: 9.5,  gap: 8 },
+  large:      { cols: 4, rows: 4, icon: 40, tileW: 70, label: 10,   gap: 8 },
+  extraLarge: { cols: 8, rows: 3, icon: 48, tileW: 76, label: 10.5, gap: 12 },
+};
 
 // 5×7 ドットマトリクス（数字と記号）
 const GLYPHS = {
@@ -101,343 +111,141 @@ const GLYPHS = {
 // ウィジェット本体
 // ============================================================
 async function makeWidget(family) {
-  const accessory = family.indexOf("accessory") === 0;
   const w = new ListWidget();
   w.spacing = 0;
-  if (!accessory) {
-    if (CLEAR) {
-      const bg = loadClearBg(family);
-      if (!bg) return calibrationWidget(w);
-      w.backgroundImage = bg;
-    } else {
-      w.backgroundColor = P.bg;
-    }
+  if (family.indexOf("accessory") === 0) {
+    addText(w, "LAUNCHER は中・大サイズで", sys(12, "medium"));
+    return w;
   }
-
+  if (CLEAR) {
+    const bg = loadClearBg(family);
+    if (!bg) return calibrationWidget(w);
+    w.backgroundImage = bg;
+  } else {
+    w.backgroundColor = P.bg;
+  }
   const now = new Date();
-  w.url = OPEN;
-  w.refreshAfterDate = nextRefresh(now);
+  w.refreshAfterDate = new Date(dayStart(now, 1).getTime() + 60 * 1000);   // 日付の見出しのため
 
-  switch (family) {
-    case "small": buildSmall(w, now); break;
-    case "large": buildLarge(w, now); break;
-    case "extraLarge": buildExtraLarge(w, now); break;
-    case "accessoryRectangular": buildRect(w, now); break;
-    case "accessoryCircular": buildCircular(w, now); break;
-    case "accessoryInline": buildInline(w, now); break;
-    default: buildMedium(w, now);
+  const g = GRID[family] || GRID.medium;
+  const per = g.cols * g.rows;
+  const apps = CONFIG.apps.slice((PAGE - 1) * per, PAGE * per);
+
+  if (family === "small") {
+    w.setPadding(13, 14, 12, 14);
+    w.url = menuUrl();                  // 小は 1 か所しかタップできない → 一覧を開く
+    grid(w, apps, g, now, false);
+    return w;
   }
+  if (family === "large" || family === "extraLarge") {
+    const pad = family === "large" ? [16, 16, 14, 16] : [18, 18, 16, 18];
+    w.setPadding(...pad);
+    header(w, now, family === "large" ? 26 : 24);
+    w.addSpacer(12);
+  } else {
+    w.setPadding(12, 13, 11, 13);
+  }
+  grid(w, apps, g, now, true);
+  w.addSpacer();
   return w;
 }
 
-// ---------- 小：曜日・日付／時刻／2 都市目／24 時間の点 ----------
-function buildSmall(w, now) {
-  w.setPadding(13, 14, 12, 14);
-  const top = hstack(w);
-  top.centerAlignContent();
-  addText(top, WEEK[now.getDay()], mono(10.5, "semibold"), P.ink);
-  top.addSpacer();
-  addText(top, md(now), mono(10.5), P.dim);
-
-  w.addSpacer(8);
-  leftLine(w, r => addClock(r, now, null, mono(26, "semibold"), P.ink));
-  const z = ZONES[0];
-  if (z) {
-    w.addSpacer(2);
-    const c = hstack(w);
-    c.centerAlignContent();
-    addText(c, short(z.label), mono(10.5, "semibold"), P.dim);
-    c.addSpacer(6);
-    addClock(c, now, z.tz, mono(10.5), P.dim);
-    c.addSpacer();
-  }
-
-  w.addSpacer();
-  hourDots(w, now, 12, 10);
-}
-
-// ---------- 中：左に時刻と日付、右に世界時計と残り ----------
-function buildMedium(w, now) {
-  w.setPadding(12, 13, 11, 13);
-  const main = hstack(w);
-  main.topAlignContent();
-  main.spacing = 12;
-
-  const left = vstack(main);
-  left.size = new Size(150, 0);
-  left.url = TAP.time;
-  leftLine(left, r => addText(r, CONFIG.home, mono(10, "semibold"), P.ink));
-  left.addSpacer(2);
-  leftLine(left, r => addClock(r, now, null, mono(30, "semibold"), P.ink));
-  left.addSpacer(6);
-  hourDots(left, now, 24, 6);
-  left.addSpacer();
-  const d = hstack(left);
-  d.centerAlignContent();
-  addDots(d, md(now), 24, P.ink);
-  d.addSpacer(8);
-  addText(d, WEEK[now.getDay()], mono(10, "semibold"), P.dim);
-  d.addSpacer();
-
-  const rule = vstack(main);
-  rule.size = new Size(1, 0);
-  rule.backgroundColor = P.rule;
-  rule.addSpacer();
-
-  const right = vstack(main);
-  right.spacing = 8;
-  right.url = TAP.world;
-  ZONES.slice(0, 2).forEach(z => {
-    const b = vstack(right);
-    b.spacing = 2;
-    const l = hstack(b);
-    l.centerAlignContent();
-    addText(l, z.label, mono(10, "semibold"), P.dim).minimumScaleFactor = 0.7;
-    l.addSpacer(6);
-    addText(l, diffLabel(now, z.tz), mono(10), P.faint);
-    l.addSpacer();
-    leftLine(b, r => addClock(r, now, z.tz, mono(15, "semibold"), P.ink));
-  });
-  const rest = vstack(right);
-  rest.spacing = 3;
-  [["TODAY", dayRatio(now)], ["MONTH", monthRatio(now)]].forEach(([label, ratio]) => {
-    const row = hstack(rest);
-    row.centerAlignContent();
-    const lb = hstack(row);
-    lb.size = new Size(40, 0);
-    addText(lb, label, mono(9, "semibold"), P.dim);
-    lb.addSpacer();
-    addDotRow(row, bar(ratio, 10), 6);
-    row.addSpacer();
-  });
-}
-
-// ---------- 大：日付／時刻／24 時間／世界時計 ----------
-function buildLarge(w, now) {
-  w.setPadding(16, 16, 14, 16);
-  largeTop(w, now);
-  w.addSpacer(12);
-  hourSection(w, now, 11.5);
-  w.addSpacer(12);
-  worldSection(w, now, 3);
-  w.addSpacer();
-}
-
-// ---------- 特大（iPad）：時刻と 24 時間｜世界時計 ----------
-function buildExtraLarge(w, now) {
-  w.setPadding(18, 18, 16, 18);
-  const main = hstack(w);
-  main.topAlignContent();
-  main.spacing = 14;
-  const left = vstack(main);
-  largeTop(left, now);
-  left.addSpacer(12);
-  hourSection(left, now, 12.5);
-  left.addSpacer();
-  const rule = vstack(main);
-  rule.size = new Size(1, 0);
-  rule.backgroundColor = P.rule;
-  rule.addSpacer();
-  const right = vstack(main);
-  worldSection(right, now, 6);
-  right.addSpacer();
-}
-
-function largeTop(parent0, now) {
-  const parent = vstack(parent0);
-  parent.url = TAP.time;
-  const h = hstack(parent);
+function header(w, now, dots) {
+  const h = hstack(w);
   h.centerAlignContent();
-  addDots(h, md(now), 26, P.ink);
+  addDots(h, md(now), dots, P.ink);
   h.addSpacer(10);
   addText(h, WEEK[now.getDay()], mono(11, "semibold"), P.ink);
   h.addSpacer();
-  addText(h, CONFIG.home, mono(10.5), P.faint);
-  parent.addSpacer(10);
-  leftLine(parent, r => addClock(r, now, null, mono(44, "semibold"), P.ink));
+  const pages = Math.ceil(CONFIG.apps.length / (GRID.large.cols * GRID.large.rows));
+  addText(h, pages > 1 ? "APPS " + PAGE + "/" + pages : "APPS", mono(10.5), P.faint);
 }
 
-// 見出し「24H」＋24 個の点（今の時間だけ赤）と 0/6/12/18 の目盛り
-function hourSection(parent0, now, pitch) {
-  const parent = vstack(parent0);
-  parent.url = TAP.hours;
-  sectionHead(parent, "24H", pad2(now.getHours()) + ":00–");
-  leftLine(parent, r => addDotRow(r, hourStates(now), pitch));
-  parent.addSpacer(3);
-  const marks = hstack(parent);
-  [0, 6, 12, 18].forEach(hh => {
-    const c = hstack(marks);
-    c.size = new Size(pitch * 6, 0);
-    addText(c, String(hh), mono(9), P.faint);
-    c.addSpacer();
-  });
-  marks.addSpacer();
-}
-
-// 見出し「WORLD」＋都市ごとに「名前 時差 …… 時刻」
-function worldSection(parent0, now, max) {
-  const parent = vstack(parent0);
-  parent.url = TAP.world;
-  sectionHead(parent, "WORLD", "");
+// タイルを cols 列に並べる。tap = タイルごとに開く先を持たせる
+function grid(parent, apps, g, now, tap) {
   const box = vstack(parent);
-  box.spacing = 6;
-  if (!ZONES.length) {
-    addText(box, "都市が設定されていません", sys(12), P.dim);
+  box.spacing = g.gap;
+  if (!apps.length) {
+    addText(box, "このページにアプリはありません", sys(12), P.dim);
     return;
   }
-  ZONES.slice(0, max).forEach(z => {
+  for (let i = 0; i < apps.length; i += g.cols) {
     const row = hstack(box);
-    row.centerAlignContent();
-    addText(row, z.label, mono(11.5, "semibold"), P.ink).minimumScaleFactor = 0.7;
-    row.addSpacer(8);
-    addText(row, diffLabel(now, z.tz), mono(11), P.faint);
-    row.addSpacer();
-    addClock(row, now, z.tz, mono(16, "semibold"), P.ink, "right");
-  });
-}
-
-function sectionHead(parent, label, right) {
-  const hd = hstack(parent);
-  hd.centerAlignContent();
-  addText(hd, label, mono(10.5, "semibold"), P.dim);
-  hd.addSpacer();
-  if (right) addText(hd, right, mono(10.5), P.faint);
-  parent.addSpacer(5);
-  addRule(parent);
-  parent.addSpacer(7);
-}
-
-// ---------- ロック画面：長方形（世界時計 3 行） ----------
-function buildRect(w, now) {
-  w.addAccessoryWidgetBackground = false;
-  const box = vstack(w);
-  box.spacing = 1;
-  const rows = ZONES.slice(0, 3);
-  if (!rows.length) {
-    addText(box, "都市が未設定", sys(13, "medium"));
-    return;
-  }
-  rows.forEach(z => {
-    const s = hstack(box);
-    s.centerAlignContent();
-    s.spacing = 4;
-    const n = hstack(s);
-    n.size = new Size(66, 0);
-    addText(n, short(z.label), mono(12, "semibold")).minimumScaleFactor = 0.7;
-    n.addSpacer();
-    addClock(s, now, z.tz, mono(13, "medium"), null);
-    s.addSpacer();
-  });
-}
-
-// ---------- ロック画面：円形（2 都市目の時刻） ----------
-function buildCircular(w, now) {
-  w.addAccessoryWidgetBackground = true;
-  const z = ZONES[0];
-  centerLine(w, z ? short(z.label) : CONFIG.home, sys(10, "semibold")).minimumScaleFactor = 0.7;
-  w.addSpacer(1);
-  const s = hstack(w);
-  s.addSpacer();
-  addClock(s, now, z ? z.tz : null, mono(13, "semibold"), null, "center").minimumScaleFactor = 0.5;
-  s.addSpacer();
-}
-
-// ---------- ロック画面：インライン（時差。時刻は進まないため出さない） ----------
-function buildInline(w, now) {
-  const s = ZONES.slice(0, 2).map(z => z.label + " " + diffLabel(now, z.tz)).join(" ・ ") || CONFIG.home;
-  addText(w, s, sys(12, "medium"));
-}
-
-// ============================================================
-// 時刻
-// ============================================================
-// 自動で進む時刻：その場所の午前 0 時からの経過時間をタイマー表示する（0 時台は「24:」）
-// タイマー表示は横幅いっぱいに広がるので、揃え（left / center / right）を必ず指定する
-function addClock(parent, now, tz, font, color, align) {
-  const t = wall(now, tz);
-  let ms = ((t.h * 60 + t.m) * 60 + t.s) * 1000 + now.getMilliseconds();
-  if (t.h === 0) ms += 24 * 3600 * 1000;
-  const d = parent.addDate(new Date(now.getTime() - ms));
-  d.applyTimerStyle();
-  d.font = font;
-  if (color) d.textColor = color;
-  d.lineLimit = 1;
-  d.minimumScaleFactor = 0.7;
-  if (align === "right") d.rightAlignText();
-  else if (align === "center") d.centerAlignText();
-  else d.leftAlignText();
-  return d;
-}
-
-// その場所の年月日・時分秒（tz なし = この端末）
-function wall(now, tz) {
-  if (!tz) {
-    return { y: now.getFullYear(), mo: now.getMonth() + 1, d: now.getDate(), h: now.getHours(), m: now.getMinutes(), s: now.getSeconds() };
-  }
-  const f = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric",
-    hour: "numeric", minute: "numeric", second: "numeric",
-  });
-  const v = {};
-  f.formatToParts(now).forEach(p => { v[p.type] = +p.value; });
-  return { y: v.year, mo: v.month, d: v.day, h: v.hour % 24, m: v.minute, s: v.second };
-}
-
-function validZone(tz) {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz });
-    return true;
-  } catch (e) {
-    return false;
+    row.topAlignContent();
+    const line = apps.slice(i, i + g.cols);
+    for (let k = 0; k < g.cols; k++) {
+      if (k) row.addSpacer();
+      if (line[k]) addTile(row, line[k], g, now, tap);
+      else blank(row, g.tileW);         // 空き（最後の段の位置をそろえる）
+    }
   }
 }
 
-// この端末との時差（例 -8H / +5.5H / ±0H）
-function diffLabel(now, tz) {
-  const a = wall(now, tz), b = wall(now, null);
-  const diff = (Date.UTC(a.y, a.mo - 1, a.d, a.h, a.m) - Date.UTC(b.y, b.mo - 1, b.d, b.h, b.m)) / 3600000;
-  const n = Math.round(diff * 4) / 4;
-  return (n > 0 ? "+" : n < 0 ? "-" : "±") + Math.abs(n) + "H";
+// アイコン（角丸の地＋線画）とラベル
+function addTile(parent, app, g, now, tap) {
+  const t = vstack(parent);
+  t.size = new Size(g.tileW, 0);
+  if (tap) t.url = appUrl(app, now);
+  const top = hstack(t);
+  top.addSpacer();
+  const tile = hstack(top);
+  tile.size = new Size(g.icon, g.icon);
+  tile.cornerRadius = Math.round(g.icon * 0.28);
+  tile.centerAlignContent();
+  tile.backgroundColor = app.style === "invert" ? P.ink : P.ghost;
+  tile.addSpacer();
+  const img = tile.addImage(symbol(app.icon, g.icon));
+  const s = Math.round(g.icon * 0.5);
+  img.imageSize = new Size(s, s);
+  img.tintColor = app.style === "invert" ? P.bg : app.style === "accent" ? P.accent : P.ink;
+  tile.addSpacer();
+  top.addSpacer();
+  t.addSpacer(4);
+  const l = centerLine(t, String(app.label || ""), mono(g.label, "medium"));
+  l.textColor = app.style === "accent" ? P.accent : P.dim;
+  l.minimumScaleFactor = 0.7;
 }
 
-// 狭い場所用の略称
-const SHORT = { "LOS ANGELES": "LA", "NEW YORK": "NYC", "HONG KONG": "HKG", "SINGAPORE": "SIN", "SHANGHAI": "SHA", "HONOLULU": "HNL", "AUCKLAND": "AKL" };
-function short(label) { return label.length > 8 ? SHORT[label] || label.slice(0, 3) : label; }
-
-// 24 個の点：過ぎた時間=点灯 / 今の時間=赤 / これから=消灯
-function hourStates(now) {
-  const h = now.getHours();
-  return Array.from({ length: 24 }, (_, i) => (i < h ? 1 : i === h ? "a" : 0));
+function blank(parent, width) {
+  const b = parent.addStack();
+  b.size = new Size(width, 0);
 }
 
-// 24 時間の点を perRow 個ずつ並べる
-function hourDots(parent, now, perRow, pitch) {
-  const st = hourStates(now);
-  for (let i = 0; i < 24; i += perRow) {
-    if (i) parent.addSpacer(2);
-    leftLine(parent, r => addDotRow(r, st.slice(i, i + perRow), pitch));
+// SF Symbols の線画（名前が無ければ四角）
+function symbol(name, size) {
+  for (const n of [name, "square"]) {
+    try {
+      const s = SFSymbol.named(String(n));
+      if (!s) continue;
+      s.applyFont(Font.systemFont(Math.round(size * 0.5)));
+      s.applyLightWeight();
+      const img = s.image;
+      if (img) return img;
+    } catch (e) {
+      // 次の候補へ
+    }
   }
+  const dc = new DrawContext();
+  dc.size = new Size(1, 1);
+  return dc.getImage();
 }
 
-function dayRatio(now) { return (now - dayStart(now, 0)) / 86400000; }
-function monthRatio(now) {
-  const s = new Date(now.getFullYear(), now.getMonth(), 1), e = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return (now - s) / (e - s);
+function appUrl(app, now) {
+  const u = String(app.url || "");
+  return u === "calshow:" ? calshow(now) : u;
 }
 
-function bar(ratio, n) {
-  const k = Math.round(ratio * n);
-  return Array.from({ length: n }, (_, i) => (i < k ? 1 : 0));
+// 小サイズのタップ：このスクリプトを一覧つきで開く
+function menuUrl() {
+  const base = URLScheme.forRunningScript();
+  return base + (base.indexOf("?") >= 0 ? "&" : "?") + "launch=menu";
 }
 
-// 1 時間ごとに更新（赤い点と日付のため。時差が 30 分単位の都市があれば 30 分ごと）
-function nextRefresh(now) {
-  const half = ZONES.some(z => wall(now, z.tz).m !== now.getMinutes());
-  const step = (half ? 30 : 60) * 60 * 1000;
-  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours()).getTime();
-  let t = base;
-  while (t <= now.getTime()) t += step;
-  return new Date(t + 2000);
+// ▶ / 小サイズのタップから：一覧で選んで開く
+async function appMenu() {
+  const apps = CONFIG.apps.filter(a => a.url);
+  const i = await sheet("アプリを開く", apps.map(a => a.label));
+  if (i >= 0) Safari.open(appUrl(apps[i], new Date()));
 }
 
 // ============================================================
@@ -773,9 +581,9 @@ async function pickPhoto() {
 // アプリ内プレビュー
 // ============================================================
 async function chooseAction() {
-  const opts = [["小", "small"], ["中", "medium"], ["大", "large"]];
+  const opts = [["アプリを開く", "menu"], ["小", "small"], ["中", "medium"], ["大", "large"]];
   if (Device.isPad()) opts.push(["特大", "extraLarge"]);
-  opts.push(["ロック画面（長方形）", "accessoryRectangular"], ["透明背景を設定", "setup-clear"]);
+  opts.push(["透明背景を設定", "setup-clear"]);
   const i = await sheet("プレビュー・設定", opts.map(o => o[0]));
   return i >= 0 ? opts[i][1] : null;
 }
@@ -795,8 +603,12 @@ async function preview(w, family) {
 // ============================================================
 // 実行（ファイルの最後に置くこと）
 // ============================================================
-const family = config.widgetFamily || (config.runsInApp ? await chooseAction() : "medium");
-if (family === "setup-clear") {
+// 小サイズのタップ（URL に launch=menu）なら一覧を出す
+const MENU = (args.queryParameters || {}).launch === "menu";
+const family = MENU ? "menu" : config.widgetFamily || (config.runsInApp ? await chooseAction() : "medium");
+if (family === "menu") {
+  await appMenu();
+} else if (family === "setup-clear") {
   await setupClear();
 } else if (family) {
   const widget = await makeWidget(family);

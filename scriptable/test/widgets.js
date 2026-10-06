@@ -28,6 +28,7 @@ const CASES = {
   'todo-widget.js': [['通常', { reminders: REM.A }], ['過多', { reminders: REM.MANY }], ['長文', { reminders: REM.LONG }], ['完了', { reminders: REM.DONE }],
                      ['空', { reminders: [] }], ['権限なし', { remFail: true }], ['透明未設定', { reminders: REM.A, param: '透明' }]],
   'clock-widget.js': [['通常', {}], ['0時台', { now: T(0, 0, 30) }], ['都市指定', { param: 'シドニー,オークランド,デリー' }], ['透明未設定', { param: '透明' }]],
+  'launcher-widget.js': [['1 ページ目', {}], ['2 ページ目', { param: '2' }], ['空ページ', { param: '9' }], ['透明未設定', { param: '透明' }]],
   'habit-widget.js': [['通常', { hab: HAB.A }], ['記録なし', { hab: HAB.NONE }], ['1 つだけ', { hab: HAB.A, param: '読書' }], ['透明未設定', { hab: HAB.A, param: '透明' }]],
 };
 
@@ -124,6 +125,38 @@ const CASES = {
   r = await run({ file: 'clock-widget.js', family: 'accessoryRectangular', now: new FDate(2026, 9, 5, 10) });
   check('CLOCK ロック画面は略称（LA）', dump(r.w).includes('"LA"'));
   check('CLOCK タップで時計アプリ', (await run({ file: 'clock-widget.js', family: 'medium', now: new FDate(2026, 9, 5, 10) })).w.url === 'clock-alarm://');
+
+  // ---------- LAUNCHER ----------
+  const urls = n => (n.url && n.kind !== 'widget' ? [n.url] : []).concat((n.children || []).flatMap(urls));
+  r = await run({ file: 'launcher-widget.js', family: 'medium', now: T(1, 10) });
+  let u = urls(r.w);
+  check('LAUNCHER 中：8 個それぞれ別のアプリを開く', u.length === 8 && new Set(u).size === 8 && u[2] === 'notion://' && u[3] === 'claude://', u.join(' '));
+  t = dump(r.w);
+  check('LAUNCHER Notion・STUDY は黒地、赤は Claude だけ', (t.match(/bg#0d0d0d\n/g) || []).length === 2 && (t.match(/#ff3b30/g) || []).length === 2 && /sparkle 19 #ff3b30/.test(t));
+  check('LAUNCHER カレンダーは今日を開く', /^calshow:\d+$/.test(u[0]));
+  r = await run({ file: 'launcher-widget.js', family: 'large', now: T(1, 10) });
+  check('LAUNCHER 大：16 個', urls(r.w).length === 16 && dump(r.w).includes('"APPS 1/2"'));
+  r = await run({ file: 'launcher-widget.js', family: 'large', now: T(1, 10), param: '2' });
+  check('LAUNCHER Parameter 2 で 2 ページ目（残り 2 個）', urls(r.w).join(' ') === 'shareddocuments:// translate://');
+  r = await run({ file: 'launcher-widget.js', family: 'extraLarge', pad: true, now: T(1, 10) });
+  check('LAUNCHER 特大：18 個すべて', urls(r.w).length === 18);
+  r = await run({ file: 'launcher-widget.js', family: 'small', now: T(1, 10), scriptName: 'ランチャー' });
+  check('LAUNCHER 小：タップで一覧を開く', urls(r.w).length === 0 && r.w.url.endsWith('&launch=menu'), r.w.url);
+  r = await run({ file: 'launcher-widget.js', app: true, now: T(1, 10), query: { launch: 'menu' }, sheets: [3] });
+  check('LAUNCHER 一覧で選ぶとそのアプリを開く', r.log.includes('open claude://'), r.log.join(' | '));
+
+  // ---------- タップ領域の分割 ----------
+  r = await run({ file: 'clock-widget.js', family: 'large', now: new FDate(2026, 9, 5, 10) });
+  check('CLOCK 大：時刻→アラーム／24H→タイマー／世界時計→世界時計', urls(r.w).join(' ') === 'clock-alarm:// clock-timer:// clock-worldclock://', urls(r.w).join(' '));
+  r = await run({ file: 'clock-widget.js', family: 'medium', now: new FDate(2026, 9, 5, 10) });
+  check('CLOCK 中：左→アラーム／右→世界時計', urls(r.w).join(' ') === 'clock-alarm:// clock-worldclock://', urls(r.w).join(' '));
+  r = await run({ file: 'todo-widget.js', family: 'large', now: T(0, 10, 30), reminders: REM.A });
+  const cal1 = 'calshow:' + Math.floor(T(1, 0).getTime() / 1000 - 978307200);
+  check('TODO 大：明日の欄はカレンダーの明日', urls(r.w).join(' ') === cal1 && r.w.url === 'x-apple-reminderkit://', urls(r.w).join(' '));
+  r = await run({ file: 'todo-widget.js', family: 'medium', now: T(0, 10, 30), reminders: REM.A.slice(0, 2).concat(REM.A.slice(5)) });
+  check('TODO 中：明日の区切りと行はカレンダーの明日', urls(r.w).length >= 2 && urls(r.w).every(x => x === cal1), urls(r.w).join(' '));
+  r = await run({ file: 'countdown-widget.js', family: 'large', now: T(0, 10, 30) });
+  check('COUNTDOWN 大：残り時間の欄はカレンダーの今日', urls(r.w)[0] === 'calshow:' + Math.floor(T(0, 10, 30).getTime() / 1000 - 978307200));
 
   console.log(fail ? `\n${fail} 件失敗` : '\n全ケース OK');
   process.exitCode = fail ? 1 : 0;
