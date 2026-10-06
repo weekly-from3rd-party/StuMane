@@ -303,6 +303,36 @@ const CASES = {
   await edit([async tb => { await tap(tb, 'セット：すべて'); }], { sheets: [0, 1], texts: ['朝'] });
   r = await run({ file: L, family: 'small', now: T(1, 10), param: '朝', scriptName: 'L' });
   check('LAUNCHER 小：タップ先にセット名（複製したセット「朝」）', r.w.url === 'scriptable:///run?scriptName=L&launch=menu&set=' + encodeURIComponent('朝'), r.w.url);
+
+  // 選択肢（追加画面の一覧）の編集。初めて作るときは今セットに入っているアプリも入れる
+  reset();
+  FILES.set('/icloud/launcher/sets.json', JSON.stringify([{ name: '朝', apps: [{ label: 'NOTION', icon: 'doc.text', url: 'notion://' }, { label: 'FOO', icon: 'star', url: 'foo://' }] }]));
+  const cat = () => JSON.parse(FILES.get('/icloud/launcher/catalog.json'));
+  const inCat = url => cat().find(g => g.items.some(x => x.url === url));
+  const setUrls = () => JSON.parse(FILES.get('/icloud/launcher/sets.json'))[0].apps.map(a => a.url).join(' ');
+  await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { seen = tb.lines(); }]);
+  check('LAUNCHER 選択肢：初めて作るとき、セットの中の一覧に無いアプリを「自分で追加」に入れる', (inCat('foo://') || {}).cat === '自分で追加' && inCat('notion://').cat !== '自分で追加'
+    && seen.includes('自分で追加') && seen.some(l => l.startsWith('FOO')) && seen.includes('✎ 選択肢を編集'), JSON.stringify(cat().map(g => g.cat)));
+  // 選択肢を追加（新しい種類「ゲーム」）→ 追加画面に出て、タップでセットに入る
+  await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '✎ 選択肢を編集'); await tap(tb, 'BAR'); }, async tb => { await tap(tb, '＋ 選択肢を追加'); seen = tb.lines(); }],
+    { sheets: [0, 0, 0, 6], texts: ['bar://', 'バー', 'bar', 'ゲーム'], alerts: [0] });
+  const bar = (inCat('bar://') || { items: [] }).items.find(x => x.url === 'bar://');
+  check('LAUNCHER 選択肢を追加（日本語名・表示名・新しい種類）→ 追加画面でセットに入れる', !!bar && inCat('bar://').cat === 'ゲーム' && bar.name === 'バー' && bar.label === 'BAR'
+    && setUrls() === 'notion:// foo:// bar://' && seen.some(l => l.startsWith('ゲーム（1）')), JSON.stringify(bar) + ' / ' + setUrls());
+  // 選択肢の変更・並べ替え・外す（セットの中はそのまま）
+  await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '✎ 選択肢を編集'); }, async tb => { await tap(tb, 'BAR'); }], { sheets: [0], texts: ['バー２'] });
+  check('LAUNCHER 選択肢の日本語名を変える', inCat('bar://').items[0].name === 'バー２');
+  await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '✎ 選択肢を編集'); }, async tb => { btn(tb, 'TODO', '↑'); }]);
+  check('LAUNCHER 選択肢を ↑ で並べ替え', cat()[0].items.slice(0, 2).map(x => x.label).join(' ') === 'TODO CAL', cat()[0].items.slice(0, 3).map(x => x.label).join(' '));
+  await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '✎ 選択肢を編集'); }, async tb => { btn(tb, 'BAR', '✕'); }]);
+  check('LAUNCHER 選択肢を ✕ で外す（セットの中には残る）', !inCat('bar://') && setUrls() === 'notion:// foo:// bar://');
+  // 自分で入れたアプリは「自分で追加」にも入る
+  await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '＋ 自分で入れる'); }], { sheets: [0, 0, 0], texts: ['baz://', 'baz'] });
+  check('LAUNCHER 自分で入れたアプリは選択肢の「自分で追加」にも入る', (inCat('baz://') || {}).cat === '自分で追加');
+  // 初期の選択肢に戻す：今セットに入っているアプリ（外した BAR も）を入れて作り直す
+  await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '✎ 選択肢を編集'); }, async tb => { await tap(tb, '初期の選択肢に戻す'); }], { alerts: [0] });
+  check('LAUNCHER 初期の選択肢に戻す（セットの中のアプリも入れる）', !cat().some(x => x.cat === 'ゲーム') && ['foo://', 'bar://', 'baz://'].every(u => (inCat(u) || {}).cat === '自分で追加'),
+    JSON.stringify(cat().map(g => g.cat + g.items.length)));
   reset();
 
   // ---------- タップ領域の分割 ----------

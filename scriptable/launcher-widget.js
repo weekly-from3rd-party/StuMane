@@ -19,6 +19,8 @@
        ・いちばん上の「セット：○○ ▾」… セットの切り替え・作成・名前変更・削除
        ・アプリの行 … タップで表示名・開く先・アイコン・色を変更、↑↓ で並べ替え、✕ で外す
        ・「＋ アプリを追加」… 種類ごとの一覧からタップで入れる・外す（✓ が入っている印）
+       ・その中の「✎ 選択肢を編集」… 一覧に出すアプリ（選択肢）の追加・変更・並べ替え・外す・種類の作成
+         （iCloud の launcher/catalog.json。初めて開いたときに、今セットに入っているアプリも「自分で追加」に入れる）
      名前付きのセット（例：勉強・生活）はいくつでも作れ、
      iCloud（launcher/sets.json）に保存して iPhone と iPad で共有します。
      ウィジェットの Parameter にセット名を入れると、そのセットが出ます。
@@ -277,9 +279,10 @@ async function appMenu(setName) {
 // ============================================================
 const DEFAULT_SET = "すべて";
 
-// 追加するときに選べるアプリ：種類ごとに [表示名, 日本語名] か、新しいアプリの定義
+// 追加するときに選べるアプリ（選択肢）の初期値：種類ごとに [表示名, 日本語名] か、新しいアプリの定義。
+// 実際の選択肢は ▶ →「アプリを編集」→「＋ アプリを追加」→「選択肢を編集」で変えられる（iCloud の launcher/catalog.json）
 const BASE = Object.fromEntries(CONFIG.apps.map(a => [a.label, a]));
-const CATALOG_GROUPS = [
+const DEFAULT_GROUPS = [
   ["Apple のアプリ", [["CAL", "カレンダー"], ["TODO", "リマインダー"], ["CLOCK", "時計"], ["PHOTO", "写真"], ["MUSIC", "ミュージック"],
     ["MAPS", "マップ"], ["WTHR", "天気"], ["MAIL", "メール"], ["HEALTH", "ヘルスケア"], ["FILES", "ファイル"], ["TRANS", "翻訳"],
     ["STORE", "App Store"], ["SET", "設定"],
@@ -299,11 +302,13 @@ const CATALOG_GROUPS = [
     { label: "SPOT", icon: "headphones", url: "spotify://", name: "Spotify" }]],
   ["その他", [["MARU", "丸ポップ（ショートカット経由）"]]],
 ].map(([cat, items]) => [cat, items.map(x => Array.isArray(x) ? Object.assign({}, BASE[x[0]], { name: x[1] }) : x)]);
-const CATALOG = CATALOG_GROUPS.flatMap(g => g[1]);
+const MY_GROUP = "自分で追加";
+// いまの選択肢：[{ cat, items: [{ name, label, icon, url, style, image }] }]（編集画面を開くと読み込む）
+let CHOICES = DEFAULT_GROUPS.map(([cat, items]) => ({ cat, items }));
 
-// アプリの日本語名（一覧にあれば。無ければ開く先）
+// アプリの日本語名（選択肢にあれば。無ければ開く先）
 function appName(app) {
-  const c = CATALOG.find(x => x.url === app.url);
+  const c = CHOICES.flatMap(g => g.items).find(x => x.url === app.url);
   return c ? c.name : app.url;
 }
 
@@ -383,6 +388,56 @@ async function pickIconImage() {
   return name;
 }
 
+// 選択肢：初めて作るとき（と初期に戻すとき）は、初期の選択肢＋今どれかのセットに入っているアプリすべて
+function catalogPath(fm) {
+  return fm.joinPath(fm.joinPath(fm.documentsDirectory(), DIR), "catalog.json");
+}
+
+function buildCatalog(sets) {
+  const groups = DEFAULT_GROUPS.map(([cat, items]) => ({ cat, items: items.map(x => Object.assign({}, x)) }));
+  const known = new Set(groups.flatMap(g => g.items.map(x => x.url)));
+  const mine = { cat: MY_GROUP, items: [] };
+  sets.forEach(set => set.apps.forEach(a => {
+    if (!a.url || known.has(a.url)) return;
+    known.add(a.url);
+    mine.items.push(Object.assign({ name: a.label }, a));
+  }));
+  groups.push(mine);
+  return groups;
+}
+
+async function loadCatalog(sets) {
+  const fm = store();
+  const p = catalogPath(fm);
+  if (fm.fileExists(p)) {
+    try {
+      await fm.downloadFileFromiCloud(p);
+      const g = JSON.parse(fm.readString(p));
+      if (Array.isArray(g)) return g.filter(x => x && x.cat && Array.isArray(x.items));
+    } catch (e) {
+      // 壊れていたら作り直す
+    }
+  }
+  const g = buildCatalog(sets);
+  saveCatalog(g);
+  return g;
+}
+
+function saveCatalog(groups) {
+  const fm = store();
+  const dir = fm.joinPath(fm.documentsDirectory(), DIR);
+  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+  fm.writeString(catalogPath(fm), JSON.stringify(groups));
+}
+
+// 選択肢の 1 件 → セットに入れるアプリ
+function fromChoice(c) {
+  const a = { label: c.label, icon: c.icon, url: c.url };
+  if (c.style) a.style = c.style;
+  if (c.image) a.image = c.image;
+  return a;
+}
+
 function saveSets(sets) {
   const fm = store();
   const dir = fm.joinPath(fm.documentsDirectory(), DIR);
@@ -402,7 +457,8 @@ const UI = { ink: new Color("#0d0d0d"), dim: new Color("#5c5c59"), faint: new Co
 
 async function editMenu() {
   const sets = await loadSets();
-  await loadIcons(sets.flatMap(x => x.apps));
+  CHOICES = await loadCatalog(sets);
+  await loadIcons(sets.flatMap(x => x.apps).concat(CHOICES.flatMap(g => g.items)));
   const st = { sets, cur: Math.max(0, sets.findIndex(x => x.name === SET_NAME)) };
   const table = new UITable();
   table.showSeparators = true;
@@ -499,6 +555,14 @@ async function addScreen(st) {
   const draw = () => {
     table.removeAllRows();
     table.addRow(label("「" + set.name + "」に追加（いま " + set.apps.length + " 個）　タップで入れる・外す。終わったら閉じる"));
+    const ed = new UITableRow();
+    ed.height = 48;
+    ed.dismissOnSelect = false;
+    const et = ed.addText("✎ 選択肢を編集", "この一覧に出すアプリを追加・変更・並べ替え・外す");
+    et.titleFont = Font.semiboldSystemFont(16);
+    et.subtitleColor = UI.dim;
+    ed.onSelect = async () => { await catalogEditor(); draw(); };
+    table.addRow(ed);
     const own = new UITableRow();
     own.height = 52;
     own.dismissOnSelect = false;
@@ -507,11 +571,16 @@ async function addScreen(st) {
     ot.subtitleColor = UI.dim;
     own.onSelect = async () => {
       const app = await customApp();
-      if (app) { set.apps.push(app); saveSets(st.sets); }
+      if (app) {
+        set.apps.push(app);
+        saveSets(st.sets);
+        addToMyGroup(app);   // ほかのセットでも選べるよう、選択肢の「自分で追加」にも入れる
+      }
       draw();
     };
     table.addRow(own);
-    CATALOG_GROUPS.forEach(([cat, items]) => {
+    CHOICES.forEach(({ cat, items }) => {
+      if (!items.length) return;
       const h = new UITableRow();
       h.isHeader = true;
       h.height = 36;
@@ -531,7 +600,7 @@ async function addScreen(st) {
         row.onSelect = () => {
           const k = set.apps.findIndex(a => a.url === c.url);
           if (k >= 0) set.apps.splice(k, 1);
-          else set.apps.push({ label: c.label, icon: c.icon, url: c.url, style: c.style });
+          else set.apps.push(fromChoice(c));
           saveSets(st.sets);
           draw();
         };
@@ -542,6 +611,153 @@ async function addScreen(st) {
   };
   draw();
   await table.present(true);
+}
+
+function addToMyGroup(app) {
+  if (CHOICES.some(g => g.items.some(x => x.url === app.url))) return;
+  let g = CHOICES.find(x => x.cat === MY_GROUP);
+  if (!g) { g = { cat: MY_GROUP, items: [] }; CHOICES.push(g); }
+  g.items.push(Object.assign({ name: app.label }, app));
+  saveCatalog(CHOICES);
+}
+
+// 「選択肢を編集」：種類ごとの一覧。行をタップで変更・↑↓ で並べ替え・✕ で外す（セットの中のアプリはそのまま）
+async function catalogEditor() {
+  const table = new UITable();
+  table.showSeparators = true;
+  const draw = () => {
+    table.removeAllRows();
+    table.addRow(label("選択肢の編集（全 " + CHOICES.reduce((n, g) => n + g.items.length, 0) + " 個）　外してもセットの中のアプリは消えません"));
+    const add = new UITableRow();
+    add.height = 52;
+    add.dismissOnSelect = false;
+    const at = add.addText("＋ 選択肢を追加", "日本語名・開く先・アイコン・種類を入れる");
+    at.titleFont = Font.semiboldSystemFont(17);
+    at.subtitleColor = UI.dim;
+    add.onSelect = async () => { await newChoice(); draw(); };
+    table.addRow(add);
+    CHOICES.forEach((g, gi) => {
+      const h = new UITableRow();
+      h.height = 40;
+      h.dismissOnSelect = false;
+      h.backgroundColor = UI.ground;
+      const ht = h.addText(g.cat + "（" + g.items.length + "）", "タップで種類の名前を変える・削除");
+      ht.titleColor = UI.dim;
+      ht.subtitleColor = UI.faint;
+      h.onSelect = async () => { await groupMenu(gi); draw(); };
+      table.addRow(h);
+      g.items.forEach((c, i) => {
+        const row = new UITableRow();
+        row.height = 54;
+        row.dismissOnSelect = false;
+        appCells(row, c, 58);
+        const up = row.addButton("↑");
+        up.widthWeight = 10;
+        up.onTap = () => { swap(g.items, i, i - 1); draw(); };
+        const down = row.addButton("↓");
+        down.widthWeight = 10;
+        down.onTap = () => { swap(g.items, i, i + 1); draw(); };
+        const del = row.addButton("✕");
+        del.widthWeight = 10;
+        del.onTap = () => { g.items.splice(i, 1); saveCatalog(CHOICES); draw(); };
+        row.onSelect = async () => { await changeChoice(c, gi); draw(); };
+        table.addRow(row);
+      });
+    });
+    const reset = new UITableRow();
+    reset.height = 48;
+    reset.dismissOnSelect = false;
+    reset.addText("初期の選択肢に戻す", "今どれかのセットに入っているアプリも入れて作り直す").subtitleColor = UI.dim;
+    reset.onSelect = async () => {
+      const a = new Alert();
+      a.title = "選択肢を初期に戻しますか？";
+      a.message = "自分で変えた選択肢は元に戻ります。セットの中のアプリはそのままです。";
+      a.addDestructiveAction("初期に戻す");
+      a.addCancelAction("キャンセル");
+      if ((await a.presentAlert()) === 0) {
+        CHOICES = buildCatalog(await loadSets());
+        saveCatalog(CHOICES);
+      }
+      draw();
+    };
+    table.addRow(reset);
+    table.reload();
+  };
+  draw();
+  await table.present(true);
+}
+
+function swap(list, i, j) {
+  if (j < 0 || j >= list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  saveCatalog(CHOICES);
+}
+
+// 種類を選ぶ（新しい種類も作れる）。種類の番号を返す
+async function pickGroup(title) {
+  const k = await sheet(title, CHOICES.map(g => g.cat).concat(["＋ 新しい種類を作る"]));
+  if (k < 0) return -1;
+  if (k < CHOICES.length) return k;
+  const name = await askText("新しい種類", "例：ゲーム、買い物", "", "種類の名前");
+  if (!name) return -1;
+  const found = CHOICES.findIndex(g => g.cat === name);
+  if (found >= 0) return found;
+  CHOICES.push({ cat: name, items: [] });
+  return CHOICES.length - 1;
+}
+
+async function groupMenu(gi) {
+  const g = CHOICES[gi];
+  const k = await sheet("種類「" + g.cat + "」", ["名前を変える", "この種類を削除（中の選択肢も外す）"]);
+  if (k === 0) {
+    const name = await askText("種類の名前", "", g.cat, "種類の名前");
+    if (name) { g.cat = name; saveCatalog(CHOICES); }
+  } else if (k === 1) {
+    const a = new Alert();
+    a.title = "「" + g.cat + "」を削除しますか？";
+    a.message = "中の選択肢 " + g.items.length + " 個も一覧から外れます。セットの中のアプリはそのままです。";
+    a.addDestructiveAction("削除する");
+    a.addCancelAction("キャンセル");
+    if ((await a.presentAlert()) === 0) { CHOICES.splice(gi, 1); saveCatalog(CHOICES); }
+  }
+}
+
+// 選択肢を追加：開く先 → 日本語名 → 表示名 → アイコン → 色 → 種類
+async function newChoice() {
+  const app = await customApp(true);
+  if (!app) return;
+  const gi = await pickGroup("どの種類に入れる？");
+  if (gi < 0) return;
+  CHOICES[gi].items.push(app);
+  saveCatalog(CHOICES);
+  await notice("選択肢に追加しました", "「" + app.name + "」を「" + CHOICES[gi].cat + "」に入れました。");
+}
+
+// 選択肢を変更：日本語名・表示名・開く先・アイコン・色・種類
+async function changeChoice(c, gi) {
+  const i = await sheet("「" + c.name + "」を変更", ["日本語名", "表示名", "開く先（URL）", "アイコン", "色", "種類を移す"]);
+  if (i < 0) return;
+  if (i === 0) {
+    const t = await askText("日本語名", "一覧に出る名前です。", c.name, "日本語名");
+    if (t) c.name = t;
+  } else if (i === 1) {
+    const t = await askText("表示名", "ウィジェットに出る名前です。英大文字 6 文字くらいまで。", c.label, "表示名");
+    if (t) c.label = t.toUpperCase();
+  } else if (i === 2) {
+    const t = await askText("開く URL", "ショートカットなら shortcuts://run-shortcut?name=名前", c.url, "URL");
+    if (t) c.url = t;
+  } else if (i === 3) {
+    await askIcon(c);
+  } else if (i === 4) {
+    c.style = await askStyle(c.style);
+  } else {
+    const to = await pickGroup("どの種類に移す？");
+    if (to < 0 || to === gi) return;
+    const from = CHOICES[gi].items;
+    from.splice(from.indexOf(c), 1);
+    CHOICES[to].items.push(c);
+  }
+  saveCatalog(CHOICES);
 }
 
 // セットの切り替え・作成・名前変更・削除・初期化
@@ -620,8 +836,8 @@ async function askSetName(title, text, sets) {
   return name;
 }
 
-// 一覧に無いアプリ：URL かショートカット名 → 表示名 → アイコン → 色
-async function customApp() {
+// 一覧に無いアプリ：URL かショートカット名 →（選択肢なら日本語名）→ 表示名 → アイコン → 色
+async function customApp(withName) {
   const app = { label: "APP", icon: "square", url: "" };
   const how = await sheet("開く先", ["URL を入力する", "ショートカットを開く（名前を入力）"]);
   if (how < 0) return null;
@@ -634,9 +850,15 @@ async function customApp() {
     if (!name) return null;
     app.url = "shortcuts://run-shortcut?name=" + encodeURIComponent(name);
   }
+  if (withName) {
+    const name = await askText("日本語名", "一覧に出る名前です。例：ゲーム", "", "日本語名");
+    if (!name) return null;
+    app.name = name;
+  }
   const label = await askText("表示名", "英大文字 6 文字くらいまでが収まります。", "", "例：NOTES");
   if (label === null) return null;
   app.label = (label || "APP").toUpperCase();
+  if (!app.name) app.name = app.label;
   await askIcon(app);
   if (!app.image) app.style = await askStyle(app.style);   // 自分の画像なら色はいらない
   return app;
