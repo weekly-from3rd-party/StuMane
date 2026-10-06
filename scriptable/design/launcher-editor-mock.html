@@ -1,0 +1,216 @@
+<title>LAUNCHER 編集画面</title>
+<style>
+/* Layout: 左に Scriptable の編集画面（iPhone の幅）、右に中サイズのウィジェット。狭い画面では縦に並ぶ */
+:root {
+  --ground: #f2f1ee; --card: #ffffff; --ink: #0d0d0d; --dim: #5c5c59; --faint: rgba(13,13,13,.45);
+  --rule: rgba(13,13,13,.12); --ghost: rgba(13,13,13,.08); --accent: #ff3b30; --tint: #0a84ff;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  --sys: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ground: #1b1b1a; --card: #0f0f0f; --ink: #f2f2f2; --dim: #a8a8a5; --faint: rgba(242,242,242,.45);
+  --rule: rgba(255,255,255,.14); --ghost: rgba(255,255,255,.08); color-scheme: dark; } }
+:root[data-theme="dark"] { --ground: #1b1b1a; --card: #0f0f0f; --ink: #f2f2f2; --dim: #a8a8a5; --faint: rgba(242,242,242,.45);
+  --rule: rgba(255,255,255,.14); --ghost: rgba(255,255,255,.08); color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sys); }
+.page { max-width: 980px; margin: 0 auto; padding: 28px 16px 48px; display: flex; flex-direction: column; gap: 20px; }
+h1 { margin: 0; font: 600 22px/1.3 var(--sys); }
+.lead { margin: 0; color: var(--dim); font-size: 13.5px; line-height: 1.7; max-width: 64ch; }
+.stage { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+.phone { width: 390px; max-width: 100%; height: 720px; background: var(--card); border-radius: 36px; border: 1px solid var(--rule);
+  overflow: hidden; position: relative; display: flex; flex-direction: column; flex: none; }
+.bar { height: 48px; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid var(--rule); flex: none; }
+.bar button { background: none; border: 0; color: var(--tint); font: 500 16px var(--sys); cursor: pointer; padding: 6px 0; }
+.list { overflow-y: auto; flex: 1; }
+.row { display: flex; align-items: center; gap: 10px; min-height: 54px; padding: 6px 14px; border-bottom: 1px solid var(--rule); cursor: pointer; }
+.row:hover { background: var(--ghost); }
+.row.static { cursor: default; } .row.static:hover { background: none; }
+.row.head { background: var(--ground); min-height: 64px; }
+.row.cat { background: var(--ground); min-height: 34px; font-size: 13px; color: var(--dim); cursor: default; }
+.row.sep { min-height: 30px; justify-content: center; font: 500 11px var(--mono); color: var(--faint); cursor: default; }
+.row.note { min-height: 40px; font-size: 13px; color: var(--dim); cursor: default; }
+.ico { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; flex: none; color: var(--ink); }
+.ico svg { width: 22px; height: 22px; stroke-width: 1.5; }
+.txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.t1 { font: 600 15px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t1.big { font: 700 20px var(--sys); }
+.t1.add { font: 600 17px var(--sys); }
+.t2 { font-size: 12.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acc { color: var(--accent); }
+.btns { display: flex; gap: 2px; flex: none; }
+.btns button { width: 34px; height: 34px; border: 0; background: none; color: var(--tint); font-size: 18px; cursor: pointer; border-radius: 8px; }
+.btns button:hover { background: var(--ghost); }
+.check { width: 26px; text-align: right; color: var(--accent); font: 700 20px var(--sys); flex: none; }
+/* iOS のシート・入力（Alert の代わり） */
+.sheet { position: absolute; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: flex-end; padding: 10px; }
+.sheet[hidden] { display: none !important; }
+.sheet .box { width: 100%; background: var(--card); border-radius: 16px; overflow: hidden; }
+.sheet .ttl { padding: 14px; text-align: center; font-size: 13px; color: var(--dim); border-bottom: 1px solid var(--rule); }
+.sheet .opt { display: block; width: 100%; padding: 14px; background: none; border: 0; border-bottom: 1px solid var(--rule); color: var(--tint); font: 400 17px var(--sys); cursor: pointer; }
+.sheet .opt.cancel { font-weight: 600; border-bottom: 0; }
+.sheet input { width: calc(100% - 28px); margin: 12px 14px; padding: 10px; font: 16px var(--sys); border: 1px solid var(--rule); border-radius: 8px; background: var(--ground); color: var(--ink); }
+/* 右：中サイズのウィジェット */
+.side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cap { font: 500 11px var(--mono); color: var(--faint); letter-spacing: .04em; }
+.w { width: 338px; max-width: 100%; height: 158px; background: var(--card); border-radius: 22px; padding: 12px 13px 11px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--rule); }
+.wrow { display: flex; justify-content: space-between; }
+.tile { width: 64px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.tile .bx { width: 38px; height: 38px; border-radius: 11px; background: var(--ghost); display: flex; align-items: center; justify-content: center; color: var(--ink); }
+.tile .bx.inv { background: var(--ink); color: var(--card); } .tile .bx.acc { color: var(--accent); }
+.tile .bx svg { width: 19px; height: 19px; stroke-width: 1.5; }
+.tile span { font: 500 9.5px var(--mono); color: var(--dim); } .tile span.acc { color: var(--accent); }
+.empty { font-size: 12px; color: var(--dim); }
+.hint { font-size: 12.5px; color: var(--dim); line-height: 1.6; max-width: 340px; }
+</style>
+
+<div class="page">
+  <h1>LAUNCHER の編集画面（見本）</h1>
+  <p class="lead">Scriptable で ▶ →「アプリを編集」を開いたときの画面を、ブラウザで触れるようにした見本です。左で編集すると、右のウィジェット（中サイズ・Parameter にセット名を入れたもの）にすぐ反映されます。実機ではアイコンは黒い線画だけになり、入力欄や選択肢は iOS の標準の画面で出ます。</p>
+  <div class="stage">
+    <div class="phone" id="phone">
+      <div class="bar"><button id="close">閉じる</button></div>
+      <div class="list" id="list"></div>
+      <div class="sheet" id="sheet" hidden><div class="box" id="sheetBox"></div></div>
+    </div>
+    <div class="side">
+      <div class="cap" id="wcap">ウィジェット（中）· Parameter：すべて</div>
+      <div class="w" id="widget"></div>
+      <p class="hint">中サイズは 8 個まで表示されます。9 個目からは 2 ページ目（Parameter に「セット名,2」）です。編集画面の「── ここから 中 2 ページ目 ──」の線が目印です。</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+<script>
+// ---------- データ（スクリプトと同じ中身） ----------
+const ICON = { calendar: 'calendar', checklist: 'list-checks', 'doc.text': 'file-text', sparkle: 'sparkle', graduationcap: 'graduation-cap', 'pencil.and.outline': 'pen-line',
+  'music.note': 'music', clock: 'clock', photo: 'image', gearshape: 'settings', 'circle.circle': 'circle-dot', map: 'map', 'cloud.sun': 'cloud-sun', envelope: 'mail',
+  heart: 'heart', bag: 'shopping-bag', folder: 'folder', 'character.bubble': 'languages', message: 'message-circle', 'square.stack.3d.up': 'layers', tray: 'inbox',
+  number: 'hash', globe: 'globe', 'map.circle': 'map-pin', 'bubble.left': 'message-square', camera: 'camera', at: 'at-sign', 'play.rectangle': 'play', headphones: 'headphones',
+  star: 'star', square: 'square', circle: 'circle', book: 'book', pencil: 'pencil', cart: 'shopping-cart', gamecontroller: 'gamepad-2', dumbbell: 'dumbbell', 'fork.knife': 'utensils', house: 'house' };
+const A = (label, icon, url, name, style) => ({ label, icon, url, name, style });
+const BASE = [A('CAL','calendar','calshow:','カレンダー'), A('TODO','checklist','x-apple-reminderkit://','リマインダー'), A('NOTION','doc.text','notion://','Notion','invert'),
+  A('CLAUDE','sparkle','claude://','Claude','accent'), A('STUDY','graduationcap','https://weekly-from3rd-party.github.io/StuMane/','STUDYMANAGER','invert'),
+  A('NOTES','pencil.and.outline','goodnotes://','GoodNotes'), A('MUSIC','music.note','music://','ミュージック'), A('CLOCK','clock','clock-alarm://','時計'),
+  A('PHOTO','photo','photos-redirect://','写真'), A('SET','gearshape','App-prefs:','設定'), A('MARU','circle.circle','shortcuts://run-shortcut?name=丸ポップ','丸ポップ（ショートカット経由）'),
+  A('MAPS','map','maps://','マップ'), A('WTHR','cloud.sun','weather://','天気'), A('MAIL','envelope','message://','メール'), A('HEALTH','heart','x-apple-health://','ヘルスケア'),
+  A('STORE','bag','itms-apps://','App Store'), A('FILES','folder','shareddocuments://','ファイル'), A('TRANS','character.bubble','translate://','翻訳')];
+const by = l => BASE.find(a => a.label === l);
+const GROUPS = [
+  ['Apple のアプリ', ['CAL','TODO','CLOCK','PHOTO','MUSIC','MAPS','WTHR','MAIL','HEALTH','FILES','TRANS','STORE','SET'].map(by).concat([A('MSG','message','sms:','メッセージ'), A('SHORT','square.stack.3d.up','shortcuts://','ショートカット')])],
+  ['勉強・仕事', ['NOTION','CLAUDE','STUDY','NOTES'].map(by).concat([A('GMAIL','tray','googlegmail://','Gmail'), A('SLACK','number','slack://','Slack'), A('CHROME','globe','googlechrome://','Chrome'), A('GMAPS','map.circle','comgooglemaps://','Google マップ')])],
+  ['SNS・連絡', [A('LINE','bubble.left','line://','LINE'), A('INSTA','camera','instagram://','Instagram'), A('X','at','twitter://','X')]],
+  ['エンタメ', [A('YT','play.rectangle','youtube://','YouTube'), A('SPOT','headphones','spotify://','Spotify')]],
+  ['その他', [by('MARU')]],
+];
+const CATALOG = GROUPS.flatMap(g => g[1]);
+const ICONS = ['square','circle','star','heart','book','pencil','doc.text','folder','calendar','clock','music.note','camera','photo','map','cart','bag','gamecontroller','graduationcap','dumbbell','fork.knife','house','globe','sparkle'];
+const nameOf = a => (CATALOG.find(c => c.url === a.url) || {}).name || a.url;
+const copy = a => ({ label: a.label, icon: a.icon, url: a.url, style: a.style });
+let sets = [{ name: 'すべて', apps: BASE.map(copy) }], cur = 0, screen = 'main';
+
+// ---------- 描画 ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ico = name => `<div class="ico"><i data-lucide="${ICON[name] || 'square'}"></i></div>`;
+const appTxt = a => `<div class="txt"><div class="t1 ${a.style === 'accent' ? 'acc' : ''}">${esc(a.label)}</div><div class="t2">${esc(nameOf(a))}${a.style === 'invert' ? '・黒地' : a.style === 'accent' ? '・赤' : ''}</div></div>`;
+function draw() {
+  const set = sets[cur], L = $('list');
+  if (screen === 'main') {
+    $('close').textContent = '閉じる';
+    let h = `<div class="row head" data-act="set"><div class="txt"><div class="t1 big">セット：${esc(set.name)}  ▾</div><div class="t2">タップでセットの切り替え・作成・名前変更・削除（全 ${sets.length} 個）</div></div></div>`;
+    h += `<div class="row note">表示中のアプリ（${set.apps.length} 個）　行をタップで変更・↑↓ で並べ替え・✕ で外す</div>`;
+    if (!set.apps.length) h += `<div class="row note">まだアプリがありません。下の「＋ アプリを追加」から選んでください。</div>`;
+    set.apps.forEach((a, i) => {
+      if (i && i % 8 === 0) h += `<div class="row sep">── ここから 中 ${i / 8 + 1} ページ目${i % 16 === 0 ? '・大 ' + (i / 16 + 1) + ' ページ目' : ''} ──</div>`;
+      h += `<div class="row" data-act="edit" data-i="${i}">${ico(a.icon)}${appTxt(a)}<div class="btns"><button data-act="up" data-i="${i}" aria-label="上へ">↑</button><button data-act="down" data-i="${i}" aria-label="下へ">↓</button><button data-act="del" data-i="${i}" aria-label="外す">✕</button></div></div>`;
+    });
+    h += `<div class="row" data-act="add"><div class="txt"><div class="t1 add">＋ アプリを追加</div><div class="t2">一覧から選ぶ・自分で入れる</div></div></div>`;
+    L.innerHTML = h;
+  } else {
+    $('close').textContent = '閉じる（編集画面へ戻る）';
+    let h = `<div class="row note">「${esc(set.name)}」に追加（いま ${set.apps.length} 個）　タップで入れる・外す。終わったら閉じる</div>`;
+    h += `<div class="row" data-act="own"><div class="txt"><div class="t1 add">＋ 自分で入れる</div><div class="t2">URL・ショートカットで開くアプリ</div></div></div>`;
+    GROUPS.forEach(([cat, items]) => {
+      h += `<div class="row cat">${cat}</div>`;
+      items.forEach(c => { const has = set.apps.some(a => a.url === c.url);
+        h += `<div class="row" data-act="toggle" data-url="${esc(c.url)}">${ico(c.icon)}${appTxt(c)}<div class="check">${has ? '✓' : ''}</div></div>`; });
+    });
+    L.innerHTML = h;
+  }
+  drawWidget();
+  try { window.lucide && lucide.createIcons({ attrs: { 'stroke-width': 1.5 } }); } catch (e) {}
+}
+function drawWidget() {
+  const apps = sets[cur].apps.slice(0, 8);
+  $('wcap').textContent = 'ウィジェット（中）· Parameter：' + sets[cur].name;
+  if (!apps.length) { $('widget').innerHTML = '<div class="empty">アプリがありません（▶ →「アプリを編集」で追加）</div>'; return; }
+  const tile = a => `<div class="tile"><div class="bx ${a.style === 'invert' ? 'inv' : a.style === 'accent' ? 'acc' : ''}"><i data-lucide="${ICON[a.icon] || 'square'}"></i></div><span class="${a.style === 'accent' ? 'acc' : ''}">${esc(a.label)}</span></div>`;
+  const blank = '<div class="tile"></div>';
+  let h = '';
+  for (let r = 0; r < apps.length; r += 4) { const line = apps.slice(r, r + 4); while (line.length < 4) line.push(null); h += `<div class="wrow">${line.map(a => a ? tile(a) : blank).join('')}</div>`; }
+  $('widget').innerHTML = h;
+}
+
+// ---------- iOS のシート・入力の代わり ----------
+function sheet(title, opts) {
+  return new Promise(res => {
+    $('sheetBox').innerHTML = `<div class="ttl">${esc(title)}</div>` + opts.map((o, i) => `<button class="opt" data-k="${i}">${esc(o)}</button>`).join('') + `<button class="opt cancel" data-k="-1">キャンセル</button>`;
+    $('sheet').hidden = false;
+    $('sheetBox').onclick = e => { const b = e.target.closest('button'); if (!b) return; $('sheet').hidden = true; res(+b.dataset.k); };
+  });
+}
+function ask(title, value) {
+  return new Promise(res => {
+    $('sheetBox').innerHTML = `<div class="ttl">${esc(title)}</div><input id="inp" value="${esc(value || '')}"><button class="opt" data-k="1">決定</button><button class="opt cancel" data-k="0">キャンセル</button>`;
+    $('sheet').hidden = false; setTimeout(() => $('inp').focus(), 0);
+    $('sheetBox').onclick = e => { const b = e.target.closest('button'); if (!b) return; $('sheet').hidden = true; res(b.dataset.k === '1' ? $('inp').value.trim() : null); };
+  });
+}
+
+// ---------- 操作 ----------
+async function setMenu() {
+  const others = sets.map((x, i) => i).filter(i => i !== cur);
+  const opts = others.map(i => `切り替え：${sets[i].name}（${sets[i].apps.length} 個）`).concat(['＋ セットを作る', 'このセットの名前を変える', 'このセットを削除する', '初期に戻す']);
+  const k = await sheet(`セット（いま：${sets[cur].name}）`, opts);
+  if (k < 0) return;
+  if (k < others.length) { cur = others[k]; return; }
+  const op = k - others.length;
+  if (op === 0) { const n = await ask('セットを作る（例：勉強・生活）', ''); if (!n || sets.some(x => x.name === n) || /^\d+$/.test(n)) return;
+    const c = await sheet('中身', ['空のまま', `「${sets[cur].name}」を複製`]); if (c < 0) return;
+    sets.push({ name: n, apps: c ? sets[cur].apps.map(copy) : [] }); cur = sets.length - 1; }
+  else if (op === 1) { const n = await ask('セットの名前を変える', sets[cur].name); if (n && !sets.some(x => x.name === n)) sets[cur].name = n; }
+  else if (op === 2) { if (sets.length > 1) { sets.splice(cur, 1); cur = 0; } }
+  else { sets = [{ name: 'すべて', apps: BASE.map(copy) }]; cur = 0; }
+}
+async function editApp(a) {
+  const i = await sheet(`「${a.label}」を変更`, ['表示名', '開く先（URL）', 'アイコン', '色']);
+  if (i === 0) { const t = await ask('表示名（英大文字 6 文字くらいまで）', a.label); if (t) a.label = t.toUpperCase(); }
+  else if (i === 1) { const t = await ask('開く URL', a.url); if (t) a.url = t; }
+  else if (i === 2) { const k = await sheet(`アイコン（いま：${a.icon}）`, ['そのまま'].concat(ICONS)); if (k > 0) a.icon = ICONS[k - 1]; }
+  else if (i === 3) { const k = await sheet('色', ['白地に黒（ふつう）', '黒地に白', '赤（強調は 1 つだけがおすすめ）']); if (k >= 0) a.style = [undefined, 'invert', 'accent'][k]; }
+}
+async function ownApp() {
+  const how = await sheet('開く先', ['URL を入力する', 'ショートカットを開く（名前を入力）']); if (how < 0) return;
+  const v = await ask(how ? 'ショートカットの名前' : '開く URL（例：notion://）', ''); if (!v) return;
+  const label = await ask('表示名（例：NOTES）', ''); if (label === null) return;
+  sets[cur].apps.push({ label: (label || 'APP').toUpperCase(), icon: 'square', url: how ? 'shortcuts://run-shortcut?name=' + v : v });
+}
+$('list').addEventListener('click', async e => {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  const set = sets[cur], i = +t.dataset.i, act = t.dataset.act;
+  e.stopPropagation();
+  if (act === 'set') await setMenu();
+  else if (act === 'up' && i > 0) [set.apps[i - 1], set.apps[i]] = [set.apps[i], set.apps[i - 1]];
+  else if (act === 'down' && i < set.apps.length - 1) [set.apps[i + 1], set.apps[i]] = [set.apps[i], set.apps[i + 1]];
+  else if (act === 'del') set.apps.splice(i, 1);
+  else if (act === 'edit') await editApp(set.apps[i]);
+  else if (act === 'add') screen = 'add';
+  else if (act === 'own') await ownApp();
+  else if (act === 'toggle') { const k = set.apps.findIndex(a => a.url === t.dataset.url); if (k >= 0) set.apps.splice(k, 1); else set.apps.push(copy(CATALOG.find(c => c.url === t.dataset.url))); }
+  draw();
+});
+$('close').onclick = () => { if (screen === 'add') { screen = 'main'; draw(); } };
+draw();
+</script>
