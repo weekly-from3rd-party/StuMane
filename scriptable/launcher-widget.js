@@ -40,7 +40,7 @@ const CONFIG = {
     { label: "TODO",   icon: "checklist",          url: "x-apple-reminderkit://" },
     { label: "NOTION", icon: "doc.text",           url: "notion://", style: "invert" },
     { label: "CLAUDE", icon: "sparkle",            url: "claude://", style: "accent" },
-    { label: "STUDY",  icon: "graduationcap",      url: "https://weekly-from3rd-party.github.io/StuMane/", style: "invert" },  // studymgr の URL に変えてください
+    { label: "STUDY",  icon: "graduationcap",      url: "https://weekly-from3rd-party.github.io/StuMane/", style: "invert" },  // STUDYMANAGER（Web アプリ）
     { label: "NOTES",  icon: "pencil.and.outline", url: "goodnotes://" },
     { label: "MUSIC",  icon: "music.note",         url: "music://" },
     { label: "CLOCK",  icon: "clock",              url: "clock-alarm://" },

@@ -105,7 +105,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 - 中 4×2=8／大 4×4=16（ドット日付の見出し・`APPS 1/2`）／特大 8×3=24。Parameter の数字でページ切り替え（中 8 個・大 16 個ずつ）
 - 小は 1 か所しかタップできないので、`URLScheme.forRunningScript()&launch=menu` で Scriptable を開き、一覧から `Safari.open(url)`（2 タップ）。ロック画面は非対応の案内のみ
 - 並びは承認済みモック `design/nothing-white-v3.html` のアプリ 18 個。中の初期 8 個：CAL・TODO・NOTION・CLAUDE／STUDY・NOTES・MUSIC・CLOCK。アプリアイコンの方針どおり Notion と studymgr は黒地に白、Claude だけ赤
-- URL：`calshow:`（実行時に今日の秒数へ）、`x-apple-reminderkit://`、`notion://`、`claude://`、`goodnotes://`、`music://`、`clock-alarm://`、`photos-redirect://`、`App-prefs:`、`maps://`、`weather://`、`message://`、`x-apple-health://`、`itms-apps://`、`shareddocuments://`、`translate://`。**どれも実機未確認**。studymgr は GitHub Pages の URL を仮置き（実際の URL をユーザーに確認すること）。丸ポップは URL が不明なので、ショートカット「丸ポップ」経由（`shortcuts://run-shortcut?name=`）
+- URL：`calshow:`（実行時に今日の秒数へ）、`x-apple-reminderkit://`、`notion://`、`claude://`、`goodnotes://`、`music://`、`clock-alarm://`、`photos-redirect://`、`App-prefs:`、`maps://`、`weather://`、`message://`、`x-apple-health://`、`itms-apps://`、`shareddocuments://`、`translate://`。**どれも実機未確認**。studymgr は `https://weekly-from3rd-party.github.io/StuMane/`（ユーザー確認済み）。丸ポップは URL が不明なので、ショートカット「丸ポップ」経由（`shortcuts://run-shortcut?name=`）
 - SF Symbols の名前が無い場合は `square` に置き換える
 
 ## 5. デザイントークン
