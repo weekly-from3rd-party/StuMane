@@ -219,6 +219,11 @@ const CASES = {
   check('HOURGLASS 終わって 12 時間を過ぎたら待機', r.w.children[0].text === '砂時計 待機中');
   check('HOURGLASS「25」→ 25 分', (await hgOut('25', T(1, 9, 0))) === 'output 25');
   check('HOURGLASS「7:30」を 8:00 に → 翌日 7:30 まで（1410 分）', (await hgOut('７:30'.replace('７', '7'), T(1, 8, 0))) === 'output 1410');
+  check('HOURGLASS 時刻のいろいろな書き方（23:00 に → 6:30 まで 450 分）',
+    (await hgOut('6時30分', T(1, 23, 0))) === 'output 450' && (await hgOut('午前6:30', T(1, 23, 0))) === 'output 450'
+    && (await hgOut('2026/10/07 6:30', T(1, 23, 0))) === 'output 450' && (await hgOut('６：３０', T(1, 23, 0))) === 'output 450');
+  check('HOURGLASS 午後の時刻（9:00 に「午後11:15」→ 855 分）', (await hgOut('午後11:15', T(1, 9, 0))) === 'output 855');
+  check('HOURGLASS「7時」→ 7:00 まで（6:00 に → 60 分）', (await hgOut('7時', T(1, 6, 0))) === 'output 60');
   check('HOURGLASS 読めない値は開始しない（0 を返す）', (await hgOut('あとで', T(1, 8, 0))) === 'output 0');
   check('HOURGLASS「停止」で記録を消す', (await hgOut('停止', T(1, 8, 10))) === 'output 0'
     && (await run({ file: HG, family: 'accessoryInline', now: T(1, 8, 20) })).w.children[0].text === '砂時計 待機中');

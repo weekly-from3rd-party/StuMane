@@ -339,18 +339,20 @@ function nextRefresh(S, now) {
 }
 
 // ショートカットから：「6:00」→ 次の 6:00 まで ／「25」→ 25 分 ／「停止」→ 記録を消す。開始した分を返す
+// 時刻は「6:30」「6時30分」「午後11:00」「2026/10/07 6:30」なども読める（最後に出てくる時刻を使う）
 function startFrom(input, now) {
-  const t = String(input || "").trim().replace(/：/g, ":");
+  const t = String(input || "").trim()
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/：/g, ":");
   if (/^(停止|stop|止める)$/i.test(t)) {
     saveState(null);
     return { minutes: 0, message: "砂時計を止めました。時計アプリのタイマーは、時計アプリで止めてください。" };
   }
   let end, label;
-  const m = t.match(/^(\d{1,2}):(\d{2})$/);
-  if (m && +m[1] < 24 && +m[2] < 60) {
-    end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), +m[1], +m[2]);
+  const at = parseClock(t);
+  if (at) {
+    end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), at.h, at.m);
     if (end <= now) end = new Date(end.getTime() + 24 * 3600 * 1000);
-    label = +m[1] + ":" + m[2] + " まで";
+    label = at.h + ":" + pad2(at.m) + " まで";
   } else if (/^\d+(\.\d+)?$/.test(t) && +t > 0 && +t <= 24 * 60) {
     end = new Date(now.getTime() + Math.round(+t * 60) * 1000);
     label = String(+t) + " 分";
@@ -362,6 +364,18 @@ function startFrom(input, now) {
   const start = new Date(now.getTime());
   saveState({ start, end: new Date(start.getTime() + minutes * 60000), label });
   return { minutes, message: label + "（" + minutes + " 分）で開始しました。" };
+}
+
+// 文字の中の時刻（最後のもの）→ { h, m }。午前・午後 / AM・PM に対応
+function parseClock(t) {
+  const all = Array.from(t.matchAll(/(\d{1,2})\s*(?::|時)\s*(\d{1,2})?\s*分?/g));
+  if (!all.length) return null;
+  const x = all[all.length - 1];
+  let h = +x[1], m = x[2] === undefined ? 0 : +x[2];
+  const pm = /午後|PM/i.test(t), am = /午前|AM/i.test(t);
+  if (pm && h < 12) h += 12;
+  if (am && h === 12) h = 0;
+  return h < 24 && m < 60 ? { h, m } : null;
 }
 
 // ============================================================
