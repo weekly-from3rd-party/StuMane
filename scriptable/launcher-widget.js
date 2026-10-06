@@ -145,15 +145,10 @@ async function makeWidget(family, setName) {
   const set = pickSet(await loadSets(), setName);
   const g = GRID[family] || GRID.medium;
   const per = g.cols * g.rows;
+  if (family === "small") return small(w, set, now);
   const apps = set.apps.slice((PAGE - 1) * per, PAGE * per);
   await loadIcons(apps);
 
-  if (family === "small") {
-    w.setPadding(13, 14, 12, 14);
-    w.url = menuUrl(set.name);          // 小は 1 か所しかタップできない → 一覧を開く
-    grid(w, apps, g, now, false);
-    return w;
-  }
   if (family === "large" || family === "extraLarge") {
     const pad = family === "large" ? [16, 16, 14, 16] : [18, 18, 16, 18];
     w.setPadding(...pad);
@@ -163,6 +158,23 @@ async function makeWidget(family, setName) {
     w.setPadding(12, 13, 11, 13);
   }
   grid(w, apps, g, now, true);
+  w.addSpacer();
+  return w;
+}
+
+// 小：1 か所しかタップできないので、アプリ 1 個を大きく出してそのまま開く（2026-10-06 ユーザー選択）。
+// Parameter の数字でセットの何個目か（無ければ 1 個目）
+async function small(w, set, now) {
+  w.setPadding(12, 12, 12, 12);
+  const app = set.apps[Math.min(PAGE, set.apps.length) - 1];
+  if (!app) {
+    addText(w, "アプリがありません（▶ →「アプリを編集」で追加）", sys(12), P.dim).lineLimit = 3;
+    return w;
+  }
+  await loadIcons([app]);
+  w.url = appUrl(app, now);
+  w.addSpacer();
+  addTile(w, app, { icon: 76, tileW: 120, label: 12 }, now, false);
   w.addSpacer();
   return w;
 }

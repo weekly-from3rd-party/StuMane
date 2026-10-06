@@ -170,7 +170,11 @@ const CASES = {
   r = await run({ file: 'launcher-widget.js', family: 'extraLarge', pad: true, now: T(1, 10) });
   check('LAUNCHER 特大：18 個すべて', urls(r.w).length === 18);
   r = await run({ file: 'launcher-widget.js', family: 'small', now: T(1, 10), scriptName: 'ランチャー' });
-  check('LAUNCHER 小：タップで一覧を開く（セット名つき）', urls(r.w).length === 0 && r.w.url.endsWith('&launch=menu&set=' + encodeURIComponent('すべて')), r.w.url);
+  check('LAUNCHER 小：1 個目を大きく出し、タップでそのまま開く（メニューを挟まない）', urls(r.w).length === 0 && /^calshow:\d+$/.test(r.w.url) && dump(r.w).includes('"CAL"'), r.w.url);
+  r = await run({ file: 'launcher-widget.js', family: 'small', now: T(1, 10), param: '4' });
+  check('LAUNCHER 小：Parameter の数字でセットの何個目か', r.w.url === 'claude://' && dump(r.w).includes('"CLAUDE"'), r.w.url);
+  r = await run({ file: 'launcher-widget.js', family: 'small', now: T(1, 10), param: '99' });
+  check('LAUNCHER 小：数字が多すぎれば最後の 1 個', r.w.url === 'translate://', r.w.url);
   r = await run({ file: 'launcher-widget.js', app: true, now: T(1, 10), query: { launch: 'menu' }, sheets: [3] });
   check('LAUNCHER 一覧で選ぶとそのアプリを開く', r.log.includes('open claude://'), r.log.join(' | '));
 
@@ -302,7 +306,7 @@ const CASES = {
   check('LAUNCHER 初期に戻す', (await lUrls('', 'extraLarge')).length === 18);
   await edit([async tb => { await tap(tb, 'セット：すべて'); }], { sheets: [0, 1], texts: ['朝'] });
   r = await run({ file: L, family: 'small', now: T(1, 10), param: '朝', scriptName: 'L' });
-  check('LAUNCHER 小：タップ先にセット名（複製したセット「朝」）', r.w.url === 'scriptable:///run?scriptName=L&launch=menu&set=' + encodeURIComponent('朝'), r.w.url);
+  check('LAUNCHER 小：セット名の Parameter でそのセットの 1 個目（複製したセット「朝」）', /^calshow:\d+$/.test(r.w.url), r.w.url);
 
   // 選択肢（追加画面の一覧）の編集。初めて作るときは今セットに入っているアプリも入れる
   reset();

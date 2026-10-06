@@ -129,12 +129,12 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 ### LAUNCHER（`launcher-widget.js`）
 - 1 つのウィジェットに複数のアプリ。タイル（SF Symbols の線画・Light、角丸の地、英字ラベル）ごとに `url`
 - 中 4×2=8／大 4×4=16（ドット日付の見出し・`APPS 1/2`）／特大 8×3=24。Parameter の数字でページ切り替え（中 8 個・大 16 個ずつ）
-- 小は 1 か所しかタップできないので、`URLScheme.forRunningScript()&launch=menu` で Scriptable を開き、一覧から `Safari.open(url)`（2 タップ）。ロック画面は非対応の案内のみ
+- 小は 1 か所しかタップできないので、**アプリ 1 個を大きく（アイコン 76pt）出し、タップでそのまま開く**（2026-10-06 ユーザー選択。以前はメニュー経由の 2 タップだった）。Parameter の数字でセットの何個目か（無ければ 1 個目、多すぎれば最後）。`&launch=menu` の一覧は ▶ の「アプリを開く」と古いウィジェット用に残してある。ロック画面は非対応の案内のみ
 - 並びは承認済みモック `design/nothing-white-v3.html` のアプリ 18 個。中の初期 8 個：CAL・TODO・NOTION・CLAUDE／STUDY・NOTES・MUSIC・CLOCK。アプリアイコンの方針どおり Notion と studymgr は黒地に白、Claude だけ赤
 - URL：`calshow:`（実行時に今日の秒数へ）、`x-apple-reminderkit://`、`notion://`、`claude://`、`goodnotes://`、`music://`、`clock-alarm://`、`photos-redirect://`、`App-prefs:`、`maps://`、`weather://`、`message://`、`x-apple-health://`、`itms-apps://`、`shareddocuments://`、`translate://`。**どれも実機未確認**。studymgr は `https://weekly-from3rd-party.github.io/StuMane/`（ユーザー確認済み）。丸ポップは URL が不明なので、ショートカット「丸ポップ」経由（`shortcuts://run-shortcut?name=`）
 - SF Symbols の名前が無い場合は `square` に置き換える
 - **セット**（2026-10-06 ユーザー依頼・承認済み）：複数の LAUNCHER ウィジェットにそれぞれ別の組み合わせを出すため、アプリの組み合わせを名前付きのセットにする。iCloud の `launcher/sets.json`（`[{ name, apps: [{ label, icon, url, style }] }]`）、無ければ `CONFIG.apps` を入れた「すべて」1 つ
-  - Parameter の数字・dark・透明 以外をセット名として読む（無い名前は最初のセット）。小のタップ先は `&launch=menu&set=セット名`
+  - Parameter の数字・dark・透明 以外をセット名として読む（無い名前は最初のセット）。小はそのセットの 1 個目（`セット名,2` で 2 個目）
   - ▶ →「アプリを編集」は **UITable の一覧画面**（2026-10-06 ユーザー依頼「一覧表示を改善」・承認済み）：先頭の「セット：○○ ▾」行で切り替え・作成（空 or 複製）・名前変更・削除（最後の 1 つは不可）・初期化／アプリの行＝SF Symbols のアイコン・表示名・日本語名（黒地・赤も表記）、タップで変更（表示名・URL・アイコン `ICONS`・色）、↑↓ で並べ替え、✕ で外す（その場で保存）／中 8 個・大 16 個ごとにページの区切り行／「＋ アプリを追加」＝選択肢（`CHOICES`）を種類ごとにタップで入れる・外す（✓）、先頭に「✎ 選択肢を編集」と「自分で入れる」（URL かショートカット名。入れたアプリは選択肢の「自分で追加」にも入る）
   - テスト環境の `UITable` は present() のたびに `run({ ui: [操作, …] })` を 1 つずつ実行する。`table.find(文字)` で行を探し、`onSelect`・ボタンの `onTap` を呼ぶ
   - セット名に数字だけ・dark・light・透明・空は使えない。カンマは空白に。▶ のプレビューはセットが複数あれば選ぶ
