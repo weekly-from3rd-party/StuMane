@@ -10,7 +10,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 
 - 動作環境：iOS アプリ **Scriptable**（JavaScript でウィジェットを書けるアプリ）
 - 成果物：ウィジェットごとに **1 ファイル**。ユーザーが Scriptable に全文を貼り付けて使う
-  - `today-tomorrow-widget.js`（カレンダー）／`countdown-widget.js`（残り時間＋カウントダウン）／`todo-widget.js`（リマインダー）／`habit-widget.js`（習慣トラッカー）／`clock-widget.js`（時計・世界時計）／`launcher-widget.js`（アプリランチャー）
+  - `today-tomorrow-widget.js`（カレンダー）／`countdown-widget.js`（残り時間＋カウントダウン）／`todo-widget.js`（リマインダー）／`habit-widget.js`（習慣トラッカー）／`clock-widget.js`（時計・世界時計）／`launcher-widget.js`（アプリランチャー）／`tilt-clock-widget.js`（90 度回した時計・ロック画面用）
 - 全体の目的：待受（ロック画面）・ホーム画面・アプリアイコン・ウィジェットを、同じデザイン言語で一から作り直すこと。ウィジェットはその一部
 
 ## 2. ユーザーが明示したルール
@@ -32,6 +32,8 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 |---|---|
 | 待受（ロック画面）背景 | 完了：`assets/wallpaper/` に iPhone 用 1290×2796・iPad 用 1668×2388 |
 | ウィジェット | 完了：小・中・大・特大（iPad）・ロック画面 3 種、透明背景、暗色、カレンダー絞り込み。ユーザーが実機で使用中 |
+| TILT（90 度回した時計） | 作成済み・**実機未確認**（2026-10-06）。仕様は 4.5 章の TILT |
+| ベッドサイド時計（`/bedside/`） | 公開済みだが、ユーザーの意図（ロック画面のウィジェット）とは違った。TILT で置き換え |
 | 追加ウィジェット 5 本 | 作成済み・**実機未確認**（2026-10-05〜06）：COUNTDOWN / TODO / HABIT / CLOCK / LAUNCHER。仕様は 4.5 章 |
 | 音楽（再生中のジャケット） | 見送り（2026-10-05）。Apple Music はショートカット自動化か Last.fm 経由でしか取れず、ユーザーが今回は不要と判断 |
 | スクリーンタイム | 見送り（2026-10-06）。iOS のデータは Scriptable・ショートカットから読めず、自動化で自前計測か手入力しかないため、ユーザーが今回は不要と判断 |
@@ -98,6 +100,13 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 - ロック画面：長方形は世界時計 3 行、円形は 2 都市目、インラインは時差だけ（インラインで時刻が進むか未確認のため）
 - タップ：小・ロック画面は `clock-alarm://`（`CONFIG.open` で worldclock / timer / stopwatch）。中・大・特大は場所で分ける（時刻→アラーム／24H→タイマー／世界時計→世界時計）。**Apple の非公式 URL** なので iOS の更新で開かなくなる可能性あり
 
+### TILT（`tilt-clock-widget.js`・2026-10-06 ユーザー依頼）
+- 横向きに寝た姿勢から読めるよう、ロック画面のウィジェットに **90 度回した時刻** を出す。ユーザーの指定で **30 分刻み・`23.5` 形式**（23:10→`23`／23:40→`23.5`／7:40→`7.5`）
+- 回転はタイマー表示ではできないので、DrawContext のドット画像を回して描く（寝た姿勢の座標 (u, v) → 左 90 度は (v, 高さ−u)、右 90 度は (幅−v, u)）。そのため描き直しは iOS 任せで、00 分・30 分の 5 秒後を `refreshAfterDate` に入れている
+- 長方形（150×62 で描く）は `23` と `.5` を 2 行にして数字を最大に、円形（60×60）は 1 行。インラインは回せないので `23.5時` の文字だけ。ロック画面は白の濃淡で描く（iOS が単色に塗る）
+- Parameter `右` で右に 90 度。ホーム画面の小・中・大にも置ける（白基調のカード）
+- テスト環境の DrawContext は塗ったドットを記録する（`ascii()` で文字の絵にできる）。左右が 180 度反対の位置になること・枠からはみ出さないことを検査している
+
 ### タップ領域の分割（2026-10-06・ユーザー承認済み）
 - 小とロック画面は iOS の仕様でウィジェット全体に 1 つの URL しか持てない。中・大・特大はスタックごとに `url` を持てる
 - TODO：明日の区切り・行・欄 → `calshow:` の明日（今日はリマインダー）。COUNTDOWN：今年の残り・REMAINING 欄 → `calshow:` の今日（カウントダウンの行はその日）
@@ -149,13 +158,14 @@ todo-widget.js                リマインダーの今日のやること
 habit-widget.js               習慣トラッカー
 clock-widget.js               時計・世界時計
 launcher-widget.js            アプリランチャー
+tilt-clock-widget.js          90 度回した時計（ロック画面用・30 分刻み）
 CLAUDE.md                     この文書
 package.json                  npm test / npm run dump
 test/harness.js               Scriptable API の模擬環境（型・プロパティ名の検査つき）
 test/data.js                  テスト用の予定データ
 test/fit.js                   機種別の収まり検査
 test/regress.js               回帰テスト
-test/widgets.js               追加 5 本の収まり検査と回帰テスト
+test/widgets.js               追加ウィジェット（5 本＋TILT）の収まり検査と回帰テスト
 test/dump.js                  ウィジェットの中身をツリー表示（デバッグ用）
 assets/wallpaper/             待受背景 PNG（iPhone・iPad）
 design/nothing-white-v3.html  承認済みモック（ロック／ホーム画面・アイコンの線画）

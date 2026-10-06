@@ -1,5 +1,5 @@
 // COUNTDOWN / TODO / HABIT の検査：機種別の収まり（5 機種 × 全サイズ × ケース）と、計算・記録の回帰テスト
-const { run, dump, FDate, FILES, reset, H, W, DEV } = require('./harness');
+const { run, dump, FDate, FILES, reset, H, W, DEV, ascii } = require('./harness');
 let fail = 0; const check = (n, ok, x = '') => { if (!ok) fail++; console.log((ok ? 'OK  ' : 'NG  ') + n + (x ? '  ' + x : '')); };
 const T = (d, h, m = 0) => new FDate(2026, 9, 5 + d, h, m);   // 基準日 2026-10-05（月）
 
@@ -29,6 +29,7 @@ const CASES = {
                      ['空', { reminders: [] }], ['権限なし', { remFail: true }], ['透明未設定', { reminders: REM.A, param: '透明' }]],
   'clock-widget.js': [['通常', {}], ['0時台', { now: T(0, 0, 30) }], ['都市指定', { param: 'シドニー,オークランド,デリー' }], ['透明未設定', { param: '透明' }]],
   'launcher-widget.js': [['1 ページ目', {}], ['2 ページ目', { param: '2' }], ['空ページ', { param: '9' }], ['透明未設定', { param: '透明' }]],
+  'tilt-clock-widget.js': [['ちょうど', { now: T(0, 23, 0) }], ['半', { now: T(0, 23, 40) }], ['1 桁', { now: T(0, 7, 40) }], ['右', { now: T(0, 23, 40), param: '右' }]],
   'habit-widget.js': [['通常', { hab: HAB.A }], ['記録なし', { hab: HAB.NONE }], ['1 つだけ', { hab: HAB.A, param: '読書' }], ['透明未設定', { hab: HAB.A, param: '透明' }]],
 };
 
@@ -166,6 +167,25 @@ const CASES = {
   check('LAUNCHER 小：タップで一覧を開く', urls(r.w).length === 0 && r.w.url.endsWith('&launch=menu'), r.w.url);
   r = await run({ file: 'launcher-widget.js', app: true, now: T(1, 10), query: { launch: 'menu' }, sheets: [3] });
   check('LAUNCHER 一覧で選ぶとそのアプリを開く', r.log.includes('open claude://'), r.log.join(' | '));
+
+  // ---------- TILT（90 度回した時計） ----------
+  const tiltText = async (h, m) => (await run({ file: 'tilt-clock-widget.js', family: 'accessoryInline', now: T(0, h, m) })).w.children[0].text;
+  check('TILT 30 分刻み（23:10→23 / 23:40→23.5 / 7:40→7.5 / 0:05→0）',
+    [await tiltText(23, 10), await tiltText(23, 40), await tiltText(7, 40), await tiltText(0, 5)].join(' ') === '23時 23.5時 7.5時 0時');
+  r = await run({ file: 'tilt-clock-widget.js', family: 'accessoryRectangular', now: T(0, 23, 10) });
+  check('TILT 次の 30 分で描き直す（23:10→23:30）', r.w.refreshAfterDate.getTime() === new FDate(2026, 9, 5, 23, 30, 5).getTime());
+  r = await run({ file: 'tilt-clock-widget.js', family: 'accessoryRectangular', now: T(0, 23, 40) });
+  check('TILT 23:40 の次は翌日 0:00', r.w.refreshAfterDate.getTime() === new FDate(2026, 9, 6, 0, 0, 5).getTime());
+  const tiltImg = x => x.w.children[0].children.find(c => c.kind === 'image').src;
+  const left = tiltImg(r), right = tiltImg(await run({ file: 'tilt-clock-widget.js', family: 'accessoryRectangular', now: T(0, 23, 40), param: '右' }));
+  // 左：(x, y) = (v, 62 − u)／右：(150 − v, u) なので、右のドットは左を 180 度回した位置にある
+  const centers = (img, f) => img.ops.map(o => f(o.r.x + o.r.width / 2, o.r.y + o.r.height / 2).map(n => n.toFixed(2)).join(',') + (o.c.alpha > .5 ? '#' : '.')).sort().join(' ');
+  check('TILT 左と右は 180 度反対向き', centers(left, (x, y) => [150 - x, 62 - y]) === centers(right, (x, y) => [x, y]) && ascii(left, 5) !== ascii(right, 5));
+  const inside = img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= img.size.width + 0.01 && o.r.y + o.r.height <= img.size.height + 0.01);
+  let allIn = true;
+  for (const [h, m] of [[0, 5], [7, 40], [11, 40], [19, 10], [23, 40]]) for (const fam of ['accessoryRectangular', 'accessoryCircular', 'small'])
+    for (const param of ['', '右']) allIn = allIn && inside(tiltImg(await run({ file: 'tilt-clock-widget.js', family: fam, now: T(0, h, m), param })));
+  check('TILT どの時刻・形・向きでもドットが枠の中に収まる', allIn && left.size.width === 150 && left.size.height === 62);
 
   // ---------- タップ領域の分割 ----------
   r = await run({ file: 'clock-widget.js', family: 'large', now: new FDate(2026, 9, 5, 10) });

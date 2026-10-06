@@ -14,20 +14,20 @@ class Font { constructor(n, s) { this.name = n; this.size = s; } }
 for (const n of ['systemFont', 'mediumSystemFont', 'semiboldSystemFont', 'boldSystemFont', 'regularMonospacedSystemFont', 'mediumMonospacedSystemFont', 'semiboldMonospacedSystemFont'])
   Font[n] = s => { if (!num(s)) throw new TypeError(n); return new Font(n, s); };
 class DrawContext {
-  setFillColor(c) { if (!(c instanceof Color)) throw new TypeError('fill'); }
-  fillEllipse(r) { if (!(r instanceof Rect)) throw new TypeError('ellipse'); }
+  setFillColor(c) { if (!(c instanceof Color)) throw new TypeError('fill'); this.fill = c; }
+  fillEllipse(r) { if (!(r instanceof Rect)) throw new TypeError('ellipse'); (this.ops = this.ops || []).push({ r, c: this.fill }); }
   strokeEllipse(r) { if (!(r instanceof Rect)) throw new TypeError('strokeEllipse'); }
   setStrokeColor(c) { if (!(c instanceof Color)) throw new TypeError('stroke'); }
   setLineWidth(n) { if (!num(n)) throw new TypeError('lineWidth'); }
   drawImageAtPoint(img, pt) { if (!img || !img.__img || !(pt instanceof Point)) throw new TypeError('drawImage'); this.drawn = { img, pt }; }
   getImage() { if (!(this.size instanceof Size)) throw new TypeError('dc.size');
-    return { __img: true, size: this.size, crop: this.drawn ? { src: this.drawn.img.name, x: -this.drawn.pt.x, y: -this.drawn.pt.y, w: this.size.width, h: this.size.height } : null }; }
+    return { __img: true, size: this.size, ops: this.ops || [], crop: this.drawn ? { src: this.drawn.img.name, x: -this.drawn.pt.x, y: -this.drawn.pt.y, w: this.size.width, h: this.size.height } : null }; }
 }
 class WidgetText { constructor(t) { if (typeof t !== 'string') throw new TypeError('addText(' + typeof t + ')'); this.kind = 'text'; this.text = t; } }
 class WidgetDate { constructor(d) { if (!(d instanceof Date)) throw new TypeError('addDate'); this.kind = 'date'; this.date = d; }
   applyTimerStyle() { this.style = 'timer'; } applyTimeStyle() { this.style = 'time'; } applyDateStyle() { this.style = 'date'; }
   applyRelativeStyle() { this.style = 'relative'; } applyOffsetStyle() { this.style = 'offset'; } leftAlignText() { this.align = 'left'; } centerAlignText() { this.align = 'center'; } rightAlignText() { this.align = 'right'; } }
-class WidgetImage { constructor(i) { if (!i || !i.__img) throw new TypeError('addImage'); this.kind = 'image'; if (i.symbol) this.symbol = i.symbol; }
+class WidgetImage { constructor(i) { if (!i || !i.__img) throw new TypeError('addImage'); this.kind = 'image'; if (i.symbol) this.symbol = i.symbol; Object.defineProperty(this, 'src', { value: i }); }
   leftAlignImage() {} centerAlignImage() {} rightAlignImage() {} }
 const SF_WEIGHTS = ['UltraLight', 'Thin', 'Light', 'Regular', 'Medium', 'Semibold', 'Bold', 'Heavy', 'Black'];
 class SFSymbol { static named(n) { if (typeof n !== 'string' || !n) throw new TypeError('SFSymbol'); const s = new SFSymbol(); s.name = n; return s; }
@@ -160,4 +160,10 @@ const DEV = {
   'ProMax':  { screen: [430, 932], small: [170, 170], medium: [364, 170], large: [364, 382] },
   'iPad11':  { pad: true, small: [155, 155], medium: [342, 155], large: [342, 342], extraLarge: [715, 342] },
 };
-module.exports = { run, dump, FDate, shot, FILES, reset, H, W, DEV, timerText };
+function ascii(img, cell) {
+  const W = Math.ceil(img.size.width / cell), Hh = Math.ceil(img.size.height / cell), g = Array.from({ length: Hh }, () => Array(W).fill(' '));
+  img.ops.forEach(({ r, c }) => { const x = Math.floor((r.x + r.width / 2) / cell), y = Math.floor((r.y + r.height / 2) / cell);
+    if (g[y] && x < W && x >= 0) g[y][x] = c.alpha > 0.5 ? '#' : (g[y][x] === '#' ? '#' : '.'); });
+  return g.map(row => row.join('')).join('\n');
+}
+module.exports = { ascii, run, dump, FDate, shot, FILES, reset, H, W, DEV, timerText };
