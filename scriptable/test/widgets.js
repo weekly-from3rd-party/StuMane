@@ -224,6 +224,9 @@ const CASES = {
     && (await hgOut('2026/10/07 6:30', T(1, 23, 0))) === 'output 450' && (await hgOut('６：３０', T(1, 23, 0))) === 'output 450');
   check('HOURGLASS 午後の時刻（9:00 に「午後11:15」→ 855 分）', (await hgOut('午後11:15', T(1, 9, 0))) === 'output 855');
   check('HOURGLASS「7時」→ 7:00 まで（6:00 に → 60 分）', (await hgOut('7時', T(1, 6, 0))) === 'output 60');
+  check('HOURGLASS 長さの書き方（25分→25／1時間→60／1.5時間→90／1時間30分→90）',
+    [await hgOut('25分', T(1, 9, 0)), await hgOut('1時間', T(1, 9, 0)), await hgOut('1.5時間', T(1, 9, 0)), await hgOut('1時間30分', T(1, 9, 0))].join(' ')
+      === 'output 25 output 60 output 90 output 90');
   check('HOURGLASS 読めない値は開始しない（0 を返す）', (await hgOut('あとで', T(1, 8, 0))) === 'output 0');
   check('HOURGLASS「停止」で記録を消す', (await hgOut('停止', T(1, 8, 10))) === 'output 0'
     && (await run({ file: HG, family: 'accessoryInline', now: T(1, 8, 20) })).w.children[0].text === '砂時計 待機中');

@@ -348,8 +348,19 @@ function startFrom(input, now) {
     return { minutes: 0, message: "砂時計を止めました。時計アプリのタイマーは、時計アプリで止めてください。" };
   }
   let end, label;
-  const at = parseClock(t);
-  if (at) {
+  // 「25分」「1時間」「1.5時間」「1時間30分」は長さとして読む（時刻より先に見る）
+  const dur = t.match(/^(?:(\d+(?:\.\d+)?)\s*時間)?\s*(?:(\d+(?:\.\d+)?)\s*分)?$/);
+  if (dur && (dur[1] || dur[2])) {
+    const min = (dur[1] ? +dur[1] * 60 : 0) + (dur[2] ? +dur[2] : 0);
+    if (min > 0 && min <= 24 * 60) {
+      end = new Date(now.getTime() + Math.round(min * 60) * 1000);
+      label = min % 60 === 0 && min >= 60 ? min / 60 + " 時間" : min + " 分";
+    }
+  }
+  const at = end ? null : parseClock(t);
+  if (end) {
+    // 長さで決まった
+  } else if (at) {
     end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), at.h, at.m);
     if (end <= now) end = new Date(end.getTime() + 24 * 3600 * 1000);
     label = at.h + ":" + pad2(at.m) + " まで";
