@@ -28,6 +28,7 @@
 
    ウィジェット設定の「Parameter」（任意・カンマ区切り）
      左 / 右 … 砂時計と残り時間（30 分刻みのドット数字）を 90 度回す（長方形・小）
+     だけ    … 縦長の砂時計だけを枠いっぱいに横倒しで描く（寝た姿勢で見ると縦長。向きは 左 / 右 で）
      dark    … ホーム画面で暗色
    ============================================================ */
 
@@ -42,7 +43,9 @@ const DIR = "hourglass";   // 記録の保存先フォルダ（iCloud）
 const PARAMS = String(args.widgetParameter || "")
   .split(/[,、]/).map(s => s.trim()).filter(Boolean);
 const THEME = PARAMS.map(p => p.toLowerCase()).find(p => p === "dark" || p === "light") || CONFIG.theme;
-const TURN = PARAMS.some(p => /^(右|right)$/i.test(p)) ? "right" : PARAMS.some(p => /^(左|left)$/i.test(p)) ? "left" : null;
+// 「だけ」：砂時計だけを枠いっぱいに横倒しで描く（向きの指定がなければ左）
+const ONLY = PARAMS.some(p => /^(だけ|only)$/i.test(p));
+const TURN = PARAMS.some(p => /^(右|right)$/i.test(p)) ? "right" : PARAMS.some(p => /^(左|left)$/i.test(p)) || ONLY ? "left" : null;
 
 // ---------- 色（Nothing デザインテンプレ：白基調） ----------
 const PALETTES = {
@@ -62,9 +65,10 @@ const SAND = {
   lock: { frame: new Color("#ffffff", 0.55), sand: Color.white(), grain: Color.white(), empty: new Color("#ffffff", 0.14), text: Color.white() },
 };
 
-// 砂時計：横 9 × 縦 15 ドット。各段の中の幅（砂が入るマス）。0 の段は枠
-const HG_W = [0, 7, 7, 5, 5, 3, 1, 1, 1, 3, 5, 5, 7, 7, 0];
-const HG_CAP = 28;   // 上（または下）に入る砂の数
+// 砂時計の形：各段の中の幅（砂が入るマス）。0 の段は枠、真ん中の段がくびれ。横は 9 ドット
+const shape = W => ({ W, neck: (W.length - 1) / 2, cap: W.slice(1, (W.length - 1) / 2).reduce((a, b) => a + b, 0) });
+const HG = shape([0, 7, 7, 5, 5, 3, 1, 1, 1, 3, 5, 5, 7, 7, 0]);                                  // 9×15（上下 28 粒）
+const HG_TALL = shape([0, 7, 7, 7, 5, 5, 3, 3, 1, 1, 1, 1, 1, 3, 3, 5, 5, 7, 7, 7, 0]);           // 9×21（「だけ」用・上下 39 粒）
 
 // 5×7 ドットマトリクス（数字と小数点）
 const GLYPHS = {
@@ -187,8 +191,12 @@ function title(S) {
   return S.mode === "idle" ? "READY" : S.mode === "done" ? "DONE" : S.label;
 }
 
-// 90 度回した表示：砂時計の下に、残り時間を 30 分刻みのドット数字で
+// 90 度回した表示：砂時計の下に、残り時間を 30 分刻みのドット数字で（「だけ」は縦長の砂時計だけを枠いっぱいに）
 function tiltedWidget(w, S, frame, colors) {
+  if (ONLY) {
+    centered(w, image(S, "", frame, 0, colors, true, HG_TALL));
+    return w;
+  }
   const left = Math.round(S.frac * S.hours * 2) / 2;
   const label = S.mode === "run" ? (left % 1 ? Math.floor(left) + ".5" : String(left)) : S.mode === "done" ? "0" : "";
   centered(w, image(S, label, frame, 0, colors, true));
@@ -199,22 +207,23 @@ function tiltedWidget(w, S, frame, colors) {
 // 砂時計を描く
 // ============================================================
 // label があれば、寝た姿勢から見て砂時計の下にドット数字を置き、全体を 90 度回す
-function image(S, label, frame, pitch, colors, tilted) {
+function image(S, label, frame, pitch, colors, tilted, form) {
+  const H = form || HG, rows = H.W.length;
   const marks = [];   // 寝た姿勢の座標でのドット { x, y, d, color }
   let vw, vh, p;
   if (tilted) {
     vw = frame.height; vh = frame.width;
     const cols = label ? lineCols(label) : 0;
-    p = Math.min(vw / 9, (vh * (label ? 0.62 : 0.95)) / 15);
-    const q = label ? Math.min(vw / cols, (vh - 15 * p - p) / 7) : 0;
-    const total = 15 * p + (label ? p + 7 * q : 0);
+    p = Math.min(vw / 9, (vh * (label ? 0.62 : 0.97)) / rows);
+    const q = label ? Math.min(vw / cols, (vh - rows * p - p) / 7) : 0;
+    const total = rows * p + (label ? p + 7 * q : 0);
     const y0 = (vh - total) / 2;
-    hourglassMarks(marks, (vw - 9 * p) / 2, y0, p, S.frac, S.mode === "run", colors);
-    if (label) textMarks(marks, label, (vw - cols * q) / 2, y0 + 15 * p + p, q, colors);
+    hourglassMarks(marks, (vw - 9 * p) / 2, y0, p, S.frac, S.mode === "run", colors, H);
+    if (label) textMarks(marks, label, (vw - cols * q) / 2, y0 + rows * p + p, q, colors);
   } else {
     p = pitch;
-    vw = 9 * p; vh = 15 * p;
-    hourglassMarks(marks, 0, 0, p, S.frac, S.mode === "run", colors);
+    vw = 9 * p; vh = rows * p;
+    hourglassMarks(marks, 0, 0, p, S.frac, S.mode === "run", colors, H);
   }
   const size = tilted ? frame : frame || new Size(vw, vh);
   const ox = tilted ? 0 : (size.width - vw) / 2, oy = tilted ? 0 : (size.height - vh) / 2;
@@ -237,15 +246,17 @@ function image(S, label, frame, pitch, colors, tilted) {
 }
 
 // 砂時計のドット。上の砂は くびれ側から、下の砂は 底から 中央寄りに詰める
-function hourglassMarks(marks, x0, y0, p, frac, running, colors) {
-  const up = Math.round(HG_CAP * frac), down = HG_CAP - up;
-  const upSet = fillCells([6, 5, 4, 3, 2, 1], up), downSet = fillCells([13, 12, 11, 10, 9, 8], down);
-  for (let r = 0; r < 15; r++) {
+function hourglassMarks(marks, x0, y0, p, frac, running, colors, H) {
+  const last = H.W.length - 1, n = H.neck;
+  const up = Math.round(H.cap * frac), down = H.cap - up;
+  const range = (a, b) => Array.from({ length: Math.abs(b - a) + 1 }, (_, i) => a + (b > a ? i : -i));
+  const upSet = fillCells(range(n - 1, 1), up, H.W), downSet = fillCells(range(last - 1, n + 1), down, H.W);
+  for (let r = 0; r <= last; r++) {
     for (let c = 0; c < 9; c++) {
-      const w = HG_W[r], off = Math.abs(c - 4);
+      const w = H.W[r], off = Math.abs(c - 4);
       let color = null;
-      if (r === 0 || r === 14) color = colors.frame;
-      else if (r === 7 && c === 4) color = running && up > 0 ? colors.grain : colors.empty;   // 落ちている砂粒
+      if (r === 0 || r === last) color = colors.frame;
+      else if (r === n && c === 4) color = running && up > 0 ? colors.grain : colors.empty;   // 落ちている砂粒
       else if (w && off <= (w - 1) / 2) color = upSet.has(r + "," + c) || downSet.has(r + "," + c) ? colors.sand : colors.empty;
       else if (off === (w + 1) / 2) color = colors.frame;
       if (color) marks.push({ x: x0 + (c + 0.5) * p, y: y0 + (r + 0.5) * p, d: p * 0.8, color });
@@ -253,10 +264,10 @@ function hourglassMarks(marks, x0, y0, p, frac, running, colors) {
   }
 }
 
-function fillCells(rows, n) {
+function fillCells(rows, n, W) {
   const set = new Set();
   for (const r of rows) {
-    const w = HG_W[r];
+    const w = W[r];
     const cs = Array.from({ length: w }, (_, i) => 4 - (w - 1) / 2 + i).sort((a, b) => Math.abs(a - 4) - Math.abs(b - 4));
     for (const c of cs) {
       if (n-- <= 0) return set;
@@ -334,7 +345,7 @@ function stateAt(s, now) {
 // 砂 1 粒ぶんごと（最短 5 分）か終わる時刻に描き直す
 function nextRefresh(S, now) {
   if (S.mode !== "run") return new Date(now.getTime() + 30 * 60 * 1000);
-  const step = Math.max(5 * 60 * 1000, (S.end - S.start) / HG_CAP);
+  const step = Math.max(5 * 60 * 1000, (S.end - S.start) / (ONLY ? HG_TALL : HG).cap);
   return new Date(Math.min(S.end.getTime() + 5000, now.getTime() + step));
 }
 

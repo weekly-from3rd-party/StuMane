@@ -34,7 +34,8 @@ const CASES = {
   'tilt-clock-widget.js': [['ちょうど', { now: T(0, 23, 0) }], ['半', { now: T(0, 23, 40) }], ['1 桁', { now: T(0, 7, 40) }], ['右', { now: T(0, 23, 40), param: '右' }],
                            ['時刻', { now: T(0, 23, 40), param: '時刻' }], ['半の印', { now: T(0, 7, 40), param: '半' }]],
   'hourglass-widget.js': [['動いている', { now: T(1, 2, 0), hg: [T(1, 0), T(1, 6)] }], ['終わった', { now: T(1, 7, 0), hg: [T(1, 0), T(1, 6)] }],
-                          ['待機', { now: T(1, 2, 0), hg: null }], ['左', { now: T(1, 2, 0), hg: [T(1, 0), T(1, 6)], param: '左' }]],
+                          ['待機', { now: T(1, 2, 0), hg: null }], ['左', { now: T(1, 2, 0), hg: [T(1, 0), T(1, 6)], param: '左' }],
+                          ['だけ', { now: T(1, 2, 0), hg: [T(1, 0), T(1, 6)], param: 'だけ,右' }]],
   'habit-widget.js': [['通常', { hab: HAB.A }], ['記録なし', { hab: HAB.NONE }], ['1 つだけ', { hab: HAB.A, param: '読書' }], ['透明未設定', { hab: HAB.A, param: '透明' }]],
 };
 
@@ -235,7 +236,15 @@ const CASES = {
   const tr = hgImg(await run({ file: HG, family: 'accessoryRectangular', now: T(1, 2, 0), param: '右' }));
   const ctr = (img, f) => img.ops.map(o => f(o.r.x + o.r.width / 2, o.r.y + o.r.height / 2).map(n => n.toFixed(2)).join(',') + o.c.alpha).sort().join(' ');
   check('HOURGLASS 左・右に回すと 180 度反対向き', ctr(tl, (x, y) => [150 - x, 62 - y]) === ctr(tr, (x, y) => [x, y]));
-  check('HOURGLASS 回した表示は枠の中に収まる', [tl, tr].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)));
+  const only = hgImg(await run({ file: HG, family: 'accessoryRectangular', now: T(1, 2, 0), param: 'だけ' }));
+  const onlyR = hgImg(await run({ file: HG, family: 'accessoryRectangular', now: T(1, 2, 0), param: 'だけ,右' }));
+  const onlyHome = hgImg(await run({ file: HG, family: 'small', now: T(1, 2, 0), param: 'だけ' }));
+  const xs = only.ops.map(o => o.r.x + o.r.width / 2);
+  check('HOURGLASS「だけ」：縦長の砂時計（9×21）を長方形いっぱいに横倒しで描く', Math.max(...xs) - Math.min(...xs) > 130 && only.ops.length === onlyR.ops.length,
+    (Math.max(...xs) - Math.min(...xs)).toFixed(0) + 'pt');
+  check('HOURGLASS「だけ」：砂は上下合わせて 39 粒・落ちている砂粒だけ赤', sandLit(onlyHome) === 39 && onlyHome.ops.filter(o => o.c.hex === '#ff3b30').length === 1, String(sandLit(onlyHome)));
+  check('HOURGLASS「だけ」：左と右は 180 度反対向き', ctr(only, (x, y) => [150 - x, 62 - y]) === ctr(onlyR, (x, y) => [x, y]));
+  check('HOURGLASS 回した表示は枠の中に収まる', [only, onlyR].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)) && [tl, tr].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)));
 
   // ---------- タップ領域の分割 ----------
   r = await run({ file: 'clock-widget.js', family: 'large', now: new FDate(2026, 9, 5, 10) });
