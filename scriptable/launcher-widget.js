@@ -282,25 +282,100 @@ const DEFAULT_SET = "すべて";
 // 追加するときに選べるアプリ（選択肢）の初期値：種類ごとに [表示名, 日本語名] か、新しいアプリの定義。
 // 実際の選択肢は ▶ →「アプリを編集」→「＋ アプリを追加」→「選択肢を編集」で変えられる（iCloud の launcher/catalog.json）
 const BASE = Object.fromEntries(CONFIG.apps.map(a => [a.label, a]));
+// u(表示名, アイコン, URL, 日本語名)／sc(表示名, アイコン, 日本語名)＝URL が分からないアプリ。ショートカット「日本語名」（App を開く だけ）経由で開く
+const u = (label, icon, url, name) => ({ label, icon, url, name });
+const sc = (label, icon, name) => ({ label, icon, url: "shortcuts://run-shortcut?name=" + encodeURIComponent(name), name });
 const DEFAULT_GROUPS = [
   ["Apple のアプリ", [["CAL", "カレンダー"], ["TODO", "リマインダー"], ["CLOCK", "時計"], ["PHOTO", "写真"], ["MUSIC", "ミュージック"],
     ["MAPS", "マップ"], ["WTHR", "天気"], ["MAIL", "メール"], ["HEALTH", "ヘルスケア"], ["FILES", "ファイル"], ["TRANS", "翻訳"],
     ["STORE", "App Store"], ["SET", "設定"],
-    { label: "MSG", icon: "message", url: "sms:", name: "メッセージ" },
-    { label: "SHORT", icon: "square.stack.3d.up", url: "shortcuts://", name: "ショートカット" }]],
+    u("MSG", "message", "sms:", "メッセージ"),
+    u("SHORT", "square.stack.3d.up", "shortcuts://", "ショートカット"),
+    u("BOOKS", "book", "ibooks://", "ブック"),
+    u("POD", "mic", "podcasts://", "ポッドキャスト"),
+    u("MEMO", "note.text", "mobilenotes://", "メモ"),
+    u("FIND", "location.circle", "findmy://", "探す"),
+    u("VOICE", "waveform", "voicememos://", "ボイスメモ"),
+    u("NEWS", "newspaper", "applenews://", "News"),
+    u("TUNES", "star", "itms://", "iTunes Store"),
+    u("ASTORE", "applelogo", "applestore://", "Apple Store"),
+    u("SCRIPT", "curlybraces", "scriptable://", "Scriptable"),
+    sc("SAFARI", "safari", "Safari"),
+    sc("CAM", "camera", "カメラ"),
+    sc("FT", "video", "FaceTime"),
+    sc("PHONE", "phone", "電話"),
+    sc("PEOPLE", "person.crop.circle", "連絡先"),
+    sc("CALC", "plus.forwardslash.minus", "計算機"),
+    sc("PASS", "key", "パスワード"),
+    sc("RULER", "ruler", "計測"),
+    sc("JRNL", "book.closed", "ジャーナル"),
+    sc("PLAY", "wand.and.stars", "Playground"),
+    sc("PREV", "eye", "プレビュー"),
+    sc("PAGES", "doc.richtext", "Pages"),
+    sc("MOVIE", "film", "iMovie"),
+    sc("CLIPS", "video.badge.plus", "Clips"),
+    sc("GAMES", "gamecontroller", "ゲーム"),
+    sc("REMOTE", "tv", "リモコン"),
+    sc("ICLOUD", "icloud", "iCloud Drive"),
+    sc("VISION", "visionpro", "Apple Vision Pro の設定")]],
   ["勉強・仕事", [["NOTION", "Notion"], ["CLAUDE", "Claude"], ["STUDY", "STUDYMANAGER"], ["NOTES", "GoodNotes"],
-    { label: "GMAIL", icon: "tray", url: "googlegmail://", name: "Gmail" },
-    { label: "SLACK", icon: "number", url: "slack://", name: "Slack" },
-    { label: "CHROME", icon: "globe", url: "googlechrome://", name: "Chrome" },
-    { label: "GMAPS", icon: "map.circle", url: "comgooglemaps://", name: "Google マップ" }]],
+    u("GMAIL", "tray", "googlegmail://", "Gmail"),
+    u("SLACK", "number", "slack://", "Slack"),
+    u("CHROME", "globe", "googlechrome://", "Chrome"),
+    u("GMAPS", "map.circle", "comgooglemaps://", "Google マップ"),
+    u("WORD", "doc.text", "ms-word://", "Word"),
+    u("EXCEL", "tablecells", "ms-excel://", "Excel"),
+    u("PPT", "rectangle.on.rectangle", "ms-powerpoint://", "PowerPoint"),
+    u("DRIVE", "externaldrive", "googledrive://", "ドライブ"),
+    u("GCAL", "calendar.circle", "googlecalendar://", "Google カレンダー"),
+    u("ZOOM", "video.circle", "zoomus://", "Zoom"),
+    u("OBSDN", "diamond", "obsidian://", "Obsidian"),
+    u("GITHUB", "chevron.left.forwardslash.chevron.right", "github://", "GitHub"),
+    sc("STPLUS", "chart.bar", "Studyplus"),
+    sc("ABCEED", "character.book.closed", "abceed"),
+    sc("TOEIC", "book.closed", "TOEIC公式教材"),
+    sc("MANABO", "person.2", "manabo"),
+    sc("GEOGB", "function", "GeoGebra"),
+    sc("TORUMI", "doc.viewfinder", "トルミル"),
+    sc("WIN", "laptopcomputer", "Windows にリンク")]],
+  ["AI", [
+    u("GOOGLE", "magnifyingglass", "google://", "Google"),
+    u("GPT", "bubble.left.and.bubble.right", "chatgpt://", "ChatGPT"),
+    sc("GEMINI", "sparkles", "Gemini"),
+    sc("COPLT", "wand.and.rays", "Copilot"),
+    sc("MANUS", "hand.raised", "Manus"),
+    sc("SPARK", "bolt", "Genspark")]],
   ["SNS・連絡", [
-    { label: "LINE", icon: "bubble.left", url: "line://", name: "LINE" },
-    { label: "INSTA", icon: "camera", url: "instagram://", name: "Instagram" },
-    { label: "X", icon: "at", url: "twitter://", name: "X" }]],
+    u("LINE", "bubble.left", "line://", "LINE"),
+    u("INSTA", "camera", "instagram://", "Instagram"),
+    u("X", "at", "twitter://", "X"),
+    u("DISCRD", "person.3", "discord://", "Discord"),
+    u("TWITCH", "tv", "twitch://", "Twitch"),
+    sc("SETLOG", "list.bullet", "setlog")]],
   ["エンタメ", [
-    { label: "YT", icon: "play.rectangle", url: "youtube://", name: "YouTube" },
-    { label: "SPOT", icon: "headphones", url: "spotify://", name: "Spotify" }]],
-  ["その他", [["MARU", "丸ポップ（ショートカット経由）"]]],
+    u("YT", "play.rectangle", "youtube://", "YouTube"),
+    u("SPOT", "headphones", "spotify://", "Spotify"),
+    u("YTM", "music.note.list", "youtubemusic://", "YouTube Music"),
+    sc("JUMP", "book.pages", "ジャンプ+"),
+    sc("SWITCH", "gamecontroller", "Nintendo Switch App"),
+    sc("NSTORE", "bag", "Nintendo Store"),
+    sc("CDREC", "opticaldisc", "CDレコ"),
+    sc("IBIS", "paintbrush", "ibisPaint X")]],
+  ["買い物・お金", [
+    u("AMZN", "cart", "com.amazon.mobile.shopping://", "Amazon"),
+    sc("RKTN", "bag", "楽天市場"),
+    sc("ZOZO", "tshirt", "ZOZOTOWN"),
+    sc("MUJI", "house", "MUJI"),
+    sc("HPB", "scissors", "ホットペッパー"),
+    sc("MIZUHO", "building.columns", "みずほ銀行"),
+    sc("YUCHO", "yensign.circle", "ゆうちょ通帳"),
+    sc("UQ", "antenna.radiowaves.left.and.right", "My UQ mobile")]],
+  ["生活・その他", [["MARU", "丸ポップ（ショートカット経由）"],
+    sc("WNEWS", "cloud.sun", "weathernews"),
+    sc("ALEXA", "speaker.wave.2", "Amazon Alexa"),
+    sc("SOUND", "earbuds", "Anker soundcore"),
+    sc("NTHX", "headphones", "Nothing X"),
+    sc("RSHIFT", "calendar.badge.clock", "アールシフト")]],
 ].map(([cat, items]) => [cat, items.map(x => Array.isArray(x) ? Object.assign({}, BASE[x[0]], { name: x[1] }) : x)]);
 const MY_GROUP = "自分で追加";
 // いまの選択肢：[{ cat, items: [{ name, label, icon, url, style, image }] }]（編集画面を開くと読み込む）
@@ -406,14 +481,22 @@ function buildCatalog(sets) {
   return groups;
 }
 
+// catalog.json は { groups, known }。known＝これまでに入れた初期の選択肢の URL。
+// 開くたびに、初期の選択肢のうち known に無い（＝コードで新しく増えた）ものだけを足す。外した選択肢は戻さない
 async function loadCatalog(sets) {
   const fm = store();
   const p = catalogPath(fm);
   if (fm.fileExists(p)) {
     try {
       await fm.downloadFileFromiCloud(p);
-      const g = JSON.parse(fm.readString(p));
-      if (Array.isArray(g)) return g.filter(x => x && x.cat && Array.isArray(x.items));
+      const d = JSON.parse(fm.readString(p));
+      const raw = Array.isArray(d) ? d : d && d.groups;   // 配列だけの古い形は known なし
+      if (Array.isArray(raw)) {
+        const g = raw.filter(x => x && x.cat && Array.isArray(x.items));
+        const known = Array.isArray(d) ? [] : d.known || [];
+        if (mergeDefaults(g, known)) saveCatalog(g);
+        return g;
+      }
     } catch (e) {
       // 壊れていたら作り直す
     }
@@ -423,11 +506,33 @@ async function loadCatalog(sets) {
   return g;
 }
 
+// 初期の選択肢で、まだ一覧に無く known にも無いものを、同じ名前の種類に足す（無ければ「自分で追加」の前に種類を作る）
+function mergeDefaults(groups, known) {
+  const seen = new Set(known);
+  const have = new Set(groups.flatMap(g => g.items.map(x => x.url)));
+  let added = false;
+  DEFAULT_GROUPS.forEach(([cat, items]) => items.forEach(x => {
+    if (seen.has(x.url) || have.has(x.url)) return;
+    let g = groups.find(y => y.cat === cat);
+    if (!g) {
+      g = { cat, items: [] };
+      const mi = groups.findIndex(y => y.cat === MY_GROUP);
+      if (mi >= 0) groups.splice(mi, 0, g);
+      else groups.push(g);
+    }
+    g.items.push(Object.assign({}, x));
+    have.add(x.url);
+    added = true;
+  }));
+  return added;
+}
+
 function saveCatalog(groups) {
   const fm = store();
   const dir = fm.joinPath(fm.documentsDirectory(), DIR);
   if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
-  fm.writeString(catalogPath(fm), JSON.stringify(groups));
+  const known = DEFAULT_GROUPS.flatMap(([, items]) => items.map(x => x.url));
+  fm.writeString(catalogPath(fm), JSON.stringify({ groups, known }));
 }
 
 // 選択肢の 1 件 → セットに入れるアプリ

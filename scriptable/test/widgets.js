@@ -263,7 +263,7 @@ const CASES = {
     { sheets: [0, 0], texts: ['勉強'] });
   check('LAUNCHER セットを作る → 追加画面でタップして入れる・外す（✓）', (await lUrls('勉強')).join(' ') === 'notion:// youtube://' && seen.some(l => l.includes('YT') && l.endsWith('✓')) && seen.some(l => l.startsWith('LINE') && !l.endsWith('✓')),
     (await lUrls('勉強')).join(' '));
-  check('LAUNCHER 追加画面は種類ごと（Apple のアプリ／勉強・仕事／SNS・連絡／エンタメ／その他）', ['Apple のアプリ', '勉強・仕事', 'SNS・連絡', 'エンタメ', 'その他'].every(c => seen.includes(c)));
+  check('LAUNCHER 追加画面は種類ごと（Apple のアプリ／勉強・仕事／AI／SNS・連絡／エンタメ／買い物・お金／生活・その他）', ['Apple のアプリ', '勉強・仕事', 'AI', 'SNS・連絡', 'エンタメ', '買い物・お金', '生活・その他'].every(c => seen.includes(c)));
   // ↑ で並べ替え、✕ で外す、行のタップで表示名を変える
   await edit([async tb => { await tap(tb, 'セット：すべて'); btn(tb, 'YT', '↑'); }], { sheets: [0] });
   check('LAUNCHER ↑ で並べ替え', (await lUrls('勉強')).join(' ') === 'youtube:// notion://');
@@ -307,7 +307,7 @@ const CASES = {
   // 選択肢（追加画面の一覧）の編集。初めて作るときは今セットに入っているアプリも入れる
   reset();
   FILES.set('/icloud/launcher/sets.json', JSON.stringify([{ name: '朝', apps: [{ label: 'NOTION', icon: 'doc.text', url: 'notion://' }, { label: 'FOO', icon: 'star', url: 'foo://' }] }]));
-  const cat = () => JSON.parse(FILES.get('/icloud/launcher/catalog.json'));
+  const cat = () => JSON.parse(FILES.get('/icloud/launcher/catalog.json')).groups;
   const inCat = url => cat().find(g => g.items.some(x => x.url === url));
   const setUrls = () => JSON.parse(FILES.get('/icloud/launcher/sets.json'))[0].apps.map(a => a.url).join(' ');
   await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { seen = tb.lines(); }]);
@@ -315,7 +315,7 @@ const CASES = {
     && seen.includes('自分で追加') && seen.some(l => l.startsWith('FOO')) && seen.includes('✎ 選択肢を編集'), JSON.stringify(cat().map(g => g.cat)));
   // 選択肢を追加（新しい種類「ゲーム」）→ 追加画面に出て、タップでセットに入る
   await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '✎ 選択肢を編集'); await tap(tb, 'BAR'); }, async tb => { await tap(tb, '＋ 選択肢を追加'); seen = tb.lines(); }],
-    { sheets: [0, 0, 0, 6], texts: ['bar://', 'バー', 'bar', 'ゲーム'], alerts: [0] });
+    { sheets: [0, 0, 0, 8], texts: ['bar://', 'バー', 'bar', 'ゲーム'], alerts: [0] });
   const bar = (inCat('bar://') || { items: [] }).items.find(x => x.url === 'bar://');
   check('LAUNCHER 選択肢を追加（日本語名・表示名・新しい種類）→ 追加画面でセットに入れる', !!bar && inCat('bar://').cat === 'ゲーム' && bar.name === 'バー' && bar.label === 'BAR'
     && setUrls() === 'notion:// foo:// bar://' && seen.some(l => l.startsWith('ゲーム（1）')), JSON.stringify(bar) + ' / ' + setUrls());
@@ -326,6 +326,14 @@ const CASES = {
   check('LAUNCHER 選択肢を ↑ で並べ替え', cat()[0].items.slice(0, 2).map(x => x.label).join(' ') === 'TODO CAL', cat()[0].items.slice(0, 3).map(x => x.label).join(' '));
   await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '✎ 選択肢を編集'); }, async tb => { btn(tb, 'BAR', '✕'); }]);
   check('LAUNCHER 選択肢を ✕ で外す（セットの中には残る）', !inCat('bar://') && setUrls() === 'notion:// foo:// bar://');
+  // 保存済みの選択肢（古い配列の形）に、コードで増えた初期の選択肢を足す。外したものは戻さない
+  FILES.set('/icloud/launcher/catalog.json', JSON.stringify([{ cat: 'Apple のアプリ', items: [{ name: 'カレンダー', label: 'CAL', icon: 'calendar', url: 'calshow:' }] }]));
+  await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { seen = tb.lines(); }]);
+  check('LAUNCHER 古い選択肢に、増えた初期の選択肢（iPad のアプリ）を足す', ['obsidian://', 'ibooks://', 'discord://'].every(u => inCat(u)) && cat().length === 7
+    && seen.includes('AI') && seen.some(l => l.startsWith('OBSDN')), JSON.stringify(cat().map(g => g.cat + g.items.length)));
+  await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '✎ 選択肢を編集'); }, async tb => { btn(tb, 'OBSDN', '✕'); }]);
+  await edit([async tb => { await tap(tb, '＋ アプリを追加'); }]);
+  check('LAUNCHER 外した初期の選択肢は、開き直しても戻らない', !inCat('obsidian://'));
   // 自分で入れたアプリは「自分で追加」にも入る
   await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '＋ 自分で入れる'); }], { sheets: [0, 0, 0], texts: ['baz://', 'baz'] });
   check('LAUNCHER 自分で入れたアプリは選択肢の「自分で追加」にも入る', (inCat('baz://') || {}).cat === '自分で追加');
