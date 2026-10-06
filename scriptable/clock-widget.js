@@ -30,7 +30,7 @@
 const CONFIG = {
   theme: "light",                                     // "light"（白基調・既定）/ "dark"
   home: "TOKYO",                                      // この端末の時刻につける名前
-  cities: ["ロンドン", "ニューヨーク", "ロサンゼルス"],   // 世界時計（CITIES の名前か { label, tz }）
+  cities: ["ロンドン", "東京"],                        // 世界時計（CITIES の名前か { label, tz }）
   open: "alarm",                                      // タップで開く画面：alarm / worldclock / timer / stopwatch
 };
 const DIR = "clock";   // 透明背景の保存先フォルダ

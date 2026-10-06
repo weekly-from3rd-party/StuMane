@@ -179,7 +179,7 @@ const habit = [
 ];
 
 // ---------- CLOCK（今の時刻で動く） ----------
-const ZONES = [['LONDON', 'Europe/London'], ['NEW YORK', 'America/New_York'], ['LOS ANGELES', 'America/Los_Angeles']];
+const ZONES = [['LONDON', 'Europe/London'], ['TOKYO', 'Asia/Tokyo']];
 const live = (tz, size, w, c, align = 'left') => `<span class="tx clk" data-tz="${tz || ''}" style="font:${w} ${size}px var(--mono);color:${c};text-align:${align}">--:--:--</span>`;
 const hourStates = h => Array.from({ length: 24 }, (_, i) => (i < h ? 1 : i === h ? 'a' : 0));
 const H = new Date().getHours();

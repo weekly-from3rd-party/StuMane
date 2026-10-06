@@ -114,7 +114,7 @@ const CASES = {
   r = await run({ file: 'clock-widget.js', family: 'large', now: new FDate(2026, 9, 5, 10, 30, 15) });
   t = dump(r.w);
   check('CLOCK 時刻はタイマー表示で進む（10:30:15）', dates(r.w).every(d => d.style === 'timer') && t.includes('{10:30:15 semiboldMono 44'));
-  check('CLOCK 世界時計と時差（LONDON 11:30:15 +1H / LA 3:30:15 -7H）', t.includes('{11:30:15') && t.includes('"+1H"') && t.includes('{3:30:15') && t.includes('"-7H"'));
+  check('CLOCK 世界時計と時差（初期値 LONDON 11:30:15 +1H / TOKYO 19:30:15 +9H）', t.includes('{11:30:15') && t.includes('"+1H"') && t.includes('"TOKYO"  <semiboldMono 11.5') && t.includes('{19:30:15') && t.includes('"+9H"'));
   check('CLOCK 次の正時に更新', r.w.refreshAfterDate.getTime() === new FDate(2026, 9, 5, 11, 0, 2).getTime());
   r = await run({ file: 'clock-widget.js', family: 'large', now: new FDate(2026, 9, 5, 0, 30, 15) });
   check('CLOCK 0 時台は 24:30:15', dump(r.w).includes('{24:30:15'));
@@ -122,7 +122,7 @@ const CASES = {
   check('CLOCK 30 分単位の時差（+5.5H）と Parameter の都市', r.w.children[0].text === 'DELHI +5.5H ・ TOKYO +9H', r.w.children[0].text);
   r = await run({ file: 'clock-widget.js', family: 'small', now: new FDate(2026, 9, 5, 10), param: 'デリー' });
   check('CLOCK 時差が 30 分単位なら 30 分ごとに更新', r.w.refreshAfterDate.getTime() === new FDate(2026, 9, 5, 10, 30, 2).getTime());
-  r = await run({ file: 'clock-widget.js', family: 'accessoryRectangular', now: new FDate(2026, 9, 5, 10) });
+  r = await run({ file: 'clock-widget.js', family: 'accessoryRectangular', now: new FDate(2026, 9, 5, 10), param: 'ロサンゼルス' });
   check('CLOCK ロック画面は略称（LA）', dump(r.w).includes('"LA"'));
   check('CLOCK タップで時計アプリ', (await run({ file: 'clock-widget.js', family: 'medium', now: new FDate(2026, 9, 5, 10) })).w.url === 'clock-alarm://');
 
