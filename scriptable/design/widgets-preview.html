@@ -80,7 +80,7 @@ svg.dm { display: block; flex: none; }
 <div class="page">
   <header class="top">
     <div class="eyebrow">SCRIPTABLE · NOTHING WHITE</div>
-    <h1>追加ウィジェットとロック画面・スタンバイのデザイン案</h1>
+    <h1>追加ウィジェットとロック画面・砂時計のデザイン案</h1>
     <p class="lead">iPhone 標準機（393×852pt）の実寸です。見本データで、2026-10-06（火）10:30 時点の表示を再現しています。時計だけは今の時刻で動きます。端末がダークモードのときは、Parameter に <code>dark</code> を入れたときの暗色版で表示します。</p>
   </header>
   <div id="app"></div>
@@ -286,12 +286,63 @@ const timer = [
     + `<div class="rect">${row(tx('FOCUS', 12, { w: 600 }) + grow + tx(endLabel, 12, { w: 500 }))}${cnt(24, 600, C.ink)}</div></div></div><figcaption>ロック画面 · インライン／円形／長方形</figcaption></figure>`,
 ];
 
+// ---------- HOURGLASS（見本：0:00 開始・6:00 終了。今の時刻で砂の量が決まる） ----------
+// 9×15 ドット。F=枠、数字=その段の中の幅（砂が入るマス）
+const HG_W = [0, 7, 7, 5, 5, 3, 1, 1, 1, 3, 5, 5, 7, 7, 0];
+const HG_CAP = 28;
+// 見本は 2:00 時点で固定（残り 4 時間から秒まで動く）
+const hgEnd = new Date(Date.now() + 4 * 3600 * 1000), hgFrac = 4 / 6;   // 残りの割合
+// 砂のマス：上は下の段から中央寄りに詰め、下は底から積む
+function hgCells(frac) {
+  const up = Math.round(HG_CAP * frac), down = HG_CAP - up, cells = [];
+  const fill = (rows, n) => { const set = new Set(); for (const r of rows) { const w = HG_W[r], cs = Array.from({ length: w }, (_, i) => 4 - (w - 1) / 2 + i).sort((a, b) => Math.abs(a - 4) - Math.abs(b - 4)); for (const c of cs) { if (n-- <= 0) return set; set.add(r + ',' + c); } } return set; };
+  const upSet = fill([6, 5, 4, 3, 2, 1], up), downSet = fill([13, 12, 11, 10, 9, 8], down);
+  for (let r = 0; r < 15; r++) for (let c = 0; c < 9; c++) {
+    const w = HG_W[r], inside = w && Math.abs(c - 4) <= (w - 1) / 2;
+    let k = 'none';
+    if (r === 0 || r === 14) k = 'frame';
+    else if (r === 7 && c === 4) k = frac > 0 && frac < 1 ? 'grain' : 'empty';
+    else if (inside) k = upSet.has(r + ',' + c) || downSet.has(r + ',' + c) ? 'sand' : 'empty';
+    else if (Math.abs(c - 4) === (w + 1) / 2 || (r === 7 && Math.abs(c - 4) === 1)) k = 'frame';
+    cells.push({ r, c, k });
+  }
+  return cells;
+}
+function hourglass(p, lock, rot) {
+  // ロック画面は iOS が単色で描くので、文字色の濃淡だけで描く
+  const col = { frame: lock ? 'color-mix(in srgb, var(--ink) 55%, transparent)' : C.dim, sand: lock ? 'var(--ink)' : C.ink, grain: lock ? 'var(--ink)' : C.acc, empty: lock ? 'color-mix(in srgb, var(--ink) 14%, transparent)' : C.ghost };
+  const W0 = 9 * p, H0 = 15 * p;
+  const out = hgCells(hgFrac).filter(x => x.k !== 'none').map(({ r, c, k }) => {
+    let x = (c + .5) * p, y = (r + .5) * p;
+    if (rot) { const u = x, v = y; x = v; y = W0 - u; }
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(p * .4).toFixed(1)}" style="fill:${col[k]}"/>`;
+  }).join('');
+  return `<svg class="dm" width="${rot ? H0 : W0}" height="${rot ? W0 : H0}">${out}</svg>`;
+}
+const hgCnt = (size, w, c) => `<span class="tx hgc" style="font:${w} ${size}px var(--mono);color:${c}">--:--:--</span>`;
+const hgLeft = Math.round(hgFrac * 12) / 2;   // 残り（30 分刻み）
+const hgLabel = (hgLeft % 1 ? Math.floor(hgLeft) + '.5' : String(hgLeft));
+const hourglassItems = [
+  `<figure><div class="lock"><div class="inline">砂時計 06:00 まで</div><div class="bigtime">2:00</div><div class="slots">`
+    + `<div class="circ" style="gap:0">${hourglass(3.6, 1)}</div>`
+    + `<div class="rect" style="flex-direction:row;align-items:center;gap:10px">${hourglass(4.4, 1)}<div class="col" style="gap:2px">${tx('6:00 まで', 12, { w: 600, sys: 1 })}${hgCnt(17, 600, C.ink)}${tx('→ 06:00', 11, { w: 500 })}</div></div>`
+    + `</div></div><figcaption>ロック画面 · インライン／円形／長方形</figcaption></figure>`,
+  W('s', row(tx('6:00 まで', 10.5, { w: 600 }) + grow + tx('→ 06:00', 10.5, { c: C.dim })) + gap(6)
+    + row(grow + hourglass(5) + grow) + grow + `<div style="text-align:center">${hgCnt(20, 600, C.ink)}</div>`, '小 · 残り時間は秒まで動く'),
+  W('m', row(hourglass(7.4) + gap(16) + col(tx('6:00 まで', 13, { w: 600, sys: 1 }) + gap(4) + hgCnt(30, 600, C.ink) + gap(4)
+    + tx('00:00 → 06:00', 11, { c: C.dim }) + grow + row(tx('LEFT', 9, { w: 600, c: C.dim }) + gap(6) + tx(Math.round(hgFrac * 100) + '%', 12.5, { w: 600 })), 'align-self:stretch;flex:1'), 'flex:1'), '中 · 赤は落ちている砂粒'),
+  `<figure><div class="lock"><div class="inline">砂時計 06:00 まで</div><div class="bigtime">2:00</div><div class="slots">`
+    + `<div class="rect" style="flex-direction:row;align-items:center;justify-content:center;gap:8px">${hourglass(4.4, 1, true)}${dots(hgLabel, 30, 'var(--ink)').replace('<svg', '<svg style="transform:rotate(-90deg)"')}</div>`
+    + `</div></div><figcaption>ロック画面・左に 90 度（Parameter「左」）· 残り ${hgLabel} 時間をドットで</figcaption></figure>`,
+];
+
 document.getElementById('app').outerHTML = `<div style="display:flex;flex-direction:column;gap:48px">${[
   section('COUNTDOWN', '残り時間＋カウントダウン。赤は最も近い 1 件', countdown),
   section('TODO', 'iOS リマインダーの今日のやること。赤は最も急ぐ 1 件', todo),
   section('HABIT', '習慣トラッカー。赤い輪は今日まだの習慣（上の 1 つ）', habit),
   section('CLOCK', '時刻と世界時計は秒まで動く。赤は今の時間の点', clock),
   section('LAUNCHER', '1 つのウィジェットから複数のアプリ。黒地は Notion と studymgr、赤は Claude だけ', launcher),
+  section('HOURGLASS', '案：iOS のタイマーとショートカットで連動する砂時計。見本は 0:00 開始・6:00 終了の 2:00 時点（残り 4 時間）', hourglassItems),
   section('TIMER / STANDBY', '案：Scriptable のタイマーと、CLOCK のスタンバイ版。数字は秒まで動く。赤は進み具合の今の位置', timer),
   section('LOCK SCREEN', 'ロック画面用（インライン＝時計の上の 1 行／円形／長方形）。iOS が単色で描くので赤は出ない', lock),
 ].join('')}</div>`;
@@ -304,6 +355,8 @@ function wall(tz) {
   return [p.hour % 24, p.minute, p.second];
 }
 function tick() {
+  const hl = Math.max(0, Math.round((hgEnd - Date.now()) / 1000));
+  document.querySelectorAll('.hgc').forEach(el => { el.textContent = Math.floor(hl / 3600) + ':' + pad2(Math.floor(hl / 60) % 60) + ':' + pad2(hl % 60); });
   const left = Math.max(0, Math.round((END - Date.now()) / 1000));
   document.querySelectorAll('.cnt').forEach(el => { el.textContent = Math.floor(left / 60) + ':' + pad2(left % 60); });
   document.querySelectorAll('.clk').forEach(el => {
