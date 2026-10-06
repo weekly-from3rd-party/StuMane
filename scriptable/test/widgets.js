@@ -341,6 +341,15 @@ const CASES = {
   await edit([async tb => { await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '✎ 選択肢を編集'); }, async tb => { await tap(tb, '初期の選択肢に戻す'); }], { alerts: [0] });
   check('LAUNCHER 初期の選択肢に戻す（セットの中のアプリも入れる）', !cat().some(x => x.cat === 'ゲーム') && ['foo://', 'bar://', 'baz://'].every(u => (inCat(u) || {}).cat === '自分で追加'),
     JSON.stringify(cat().map(g => g.cat + g.items.length)));
+  // ショートカット名の置き換え（日本語名 → ユーザーが作った「アプリを開く N」）。保存済みのセット・選択肢も読むときに直す
+  const oldSafari = 'shortcuts://run-shortcut?name=Safari', newSafari = 'shortcuts://run-shortcut?name=' + encodeURIComponent('アプリを開く 2');
+  FILES.set('/icloud/launcher/sets.json', JSON.stringify([{ name: '朝', apps: [{ label: 'SAFARI', icon: 'safari', url: oldSafari }] }]));
+  FILES.set('/icloud/launcher/catalog.json', JSON.stringify({ groups: [{ cat: 'Apple のアプリ', items: [{ name: 'Safari', label: 'SAFARI', icon: 'safari', url: oldSafari }] }], known: [oldSafari] }));
+  r = await run({ file: L, family: 'medium', now: T(1, 10), param: '朝' });
+  check('LAUNCHER 保存済みのセットの開く先を、作ったショートカットの名前に置き換える', urls(r.w)[0] === newSafari && setUrls() === newSafari, urls(r.w).join(' '));
+  await edit([async tb => { await tap(tb, '＋ アプリを追加'); }]);
+  check('LAUNCHER 保存済みの選択肢も置き換え、二重にならない', cat().flatMap(g => g.items).filter(x => x.url === newSafari).length === 1 && !JSON.stringify(cat()).includes(oldSafari)
+    && (inCat('shortcuts://run-shortcut?name=' + encodeURIComponent('アプリを開く')) || {}).cat === '勉強・仕事');
   reset();
 
   // ---------- タップ領域の分割 ----------
