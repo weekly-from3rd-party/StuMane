@@ -26,7 +26,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 6. **中サイズでも終了時刻と場所を表示する。** そのために明日の予定が見えなくなるのは構わない（了承済み）
 7. 背景が透明に見えるパターンも用意する（実装済み）
 
-## 3. 現在地（2026-10-05）
+## 3. 現在地（2026-10-06）
 
 | 対象 | 状態 |
 |---|---|
@@ -221,7 +221,7 @@ iOS はウィジェットを本当に透明にできないので、ウィジェ�
 Scriptable はパソコンで動かないため、`test/harness.js` に Scriptable API の模擬環境を用意してある。Node.js 18 以上で動く（追加のインストールは不要）。
 
 - `npm test` は `test/fit.js`・`test/regress.js`・`test/widgets.js` を実行する。失敗すると終了コード 1
-- `widgets.js`：追加 5 本を 5 機種 × 全サイズ（ロック画面含む）× ケースで収まり検査し、残り日数・毎年の日付・並び順・LATE・連続日数・タップでの記録／取り消し・過去の修正を確かめる
+- `widgets.js`：追加ウィジェット（COUNTDOWN / TODO / HABIT / CLOCK / LAUNCHER / TILT / HOURGLASS）を 5 機種 × 全サイズ（ロック画面含む）× ケースで収まり検査し、計算・記録・編集・タップ先・回転・ショートカット入力を確かめる
 - `harness.js` の `run({ file })` で対象ファイルを選ぶ。`run({ shortcut: '6:00' })` でショートカットからの実行を模擬（`args.shortcutParameter`、出力は log の `output …`）。リマインダー（`reminders` / `remFail`）、iCloud ファイル、`queryParameters`（`query`）、`URLScheme`、`WidgetDate`（`addDate`）、`SFSymbol`、`Safari.open` の模擬あり。URL は「スキーム:」で始まり空白がなければ通す（calshow は秒数、scriptable は run?scriptName= の形を検査）。収まりの見積もり `H` / `W` と機種表 `DEV` も harness にある
 - `fit.js`：5 機種 × 全サイズ × 8 ケース（通常・今日 1 件・夜・予定過多・長文・空・権限なし・透明未設定）で、高さと省略できない幅が枠に収まるかを見積もる
 - `regress.js`：透明背景の検出がピクセル単位で一致するか（色ずれ・角丸・紫やマゼンタ系アイコンを含む合成スクショ）、絞り込み、時刻表記、アプリ内プレビュー
@@ -261,8 +261,9 @@ Scriptable はパソコンで動かないため、`test/harness.js` に Scriptab
 ## 10. 残っているタスク
 
 1. **アプリアイコンの書き出し**（当初の依頼範囲）：`design/nothing-white-v3.html` の線画グリフを元に、ショートカット用のアイコン PNG（1024px）を作る。白タイル＋黒の線画、Notion と studymanager は黒反転、Claude だけ赤
-2. 実機で見つかった表示の崩れや好みの調整（ユーザーの指示待ち）
-3. 必要に応じて：ホーム画面用の背景（白基調。待受と同じ地色 #f2f1ee・ドット格子の言語で）
+2. 実機で見つかった表示の崩れや好みの調整（ユーザーの指示待ち）。追加ウィジェット 7 本はどれも実機未確認
+3. デザイン案だけで未着手：Scriptable の TIMER ウィジェット、CLOCK のスタンバイ版（`design/widgets-preview.html` の TIMER / STANDBY 欄）。HOURGLASS で代わりになるかユーザーに確認していない
+4. 必要に応じて：ホーム画面用の背景（白基調。待受と同じ地色 #f2f1ee・ドット格子の言語で）
 
 ## 11. 作業スタイル（ユーザーの指定）
 
