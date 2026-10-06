@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>ベッドサイド時計</title>
+<meta name="apple-mobile-web-app-title" content="BEDSIDE">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+/* Layout: 画面全体を 1 枚のキャンバスにし、寝た姿勢から読めるよう中身ごと 90 度回す。操作パネルはタップで 6 秒だけ出す */
+:root {
+  --day-bg: #f2f1ee; --day-ink: #0d0d0d; --day-ghost: rgba(13,13,13,.08); --day-dim: #5c5c59;
+  --night-bg: #000000; --night-ink: #ff3b30; --night-dim: rgba(255,59,48,.55);
+  --accent: #ff3b30;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sys: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--night-bg); overflow: hidden; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+body.day { background: var(--day-bg); }
+#stage { position: fixed; inset: 0; overflow: hidden; }
+#rot { position: absolute; left: 50%; top: 50%; transform-origin: 50% 50%; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* 操作パネル（回転した枠の中に置くので、寝た姿勢から読める） */
+#panel { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(92%, 520px);
+  display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 18px;
+  background: rgba(20,20,20,.92); color: #f2f2f2; font: 500 12px/1.2 var(--mono);
+  opacity: 0; pointer-events: none; transition: opacity .25s; }
+body.day #panel { background: rgba(255,255,255,.96); color: var(--day-ink); box-shadow: 0 2px 20px rgba(0,0,0,.08); }
+#panel.show { opacity: 1; pointer-events: auto; }
+.prow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.plabel { width: 52px; flex: none; font-weight: 600; letter-spacing: .06em; opacity: .6; }
+#panel button { font: 600 13px/1 var(--mono); letter-spacing: .03em; color: inherit; background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 10px 12px; min-width: 46px; cursor: pointer; }
+body.day #panel button { background: var(--day-ghost); border-color: rgba(13,13,13,.12); }
+#panel button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#panel button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pnote { font: 400 11px/1.4 var(--sys); opacity: .6; }
+@media (prefers-reduced-motion: reduce) { #panel { transition: none; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="rot">
+    <canvas id="c" aria-label="時計"></canvas>
+    <div id="panel" role="dialog" aria-label="操作">
+      <div class="prow"><span class="plabel">TIMER</span>
+        <button id="t5" data-min="5">5</button><button id="t10" data-min="10">10</button>
+        <button id="t25" data-min="25">25</button><button id="t50" data-min="50">50</button>
+        <button id="tstop">STOP</button></div>
+      <div class="prow"><span class="plabel">LIGHT</span>
+        <button id="b1" data-b="1">●</button><button id="b2" data-b="2">●●</button><button id="b3" data-b="3">●●●</button></div>
+      <div class="prow"><span class="plabel">TURN</span>
+        <button id="rl" data-r="-90">左 90°</button><button id="rr" data-r="90">右 90°</button><button id="r0" data-r="0">なし</button></div>
+      <div class="prow"><span class="plabel">COLOR</span>
+        <button id="ca" data-t="auto">自動</button><button id="cd" data-t="day">昼</button><button id="cn" data-t="night">夜</button></div>
+      <div class="pnote" id="note">夜は 22 時〜6 時（自動のとき）。タイマーの音は、最初に一度画面をタップすると鳴るようになります。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- 5×7 ドット文字（数字・記号・曜日とラベルに使う英字） ----------
+const G = {
+  '0': ['01110','10001','10001','10001','10001','10001','01110'], '1': ['00100','01100','00100','00100','00100','00100','01110'],
+  '2': ['01110','10001','00001','00010','00100','01000','11111'], '3': ['01110','10001','00001','00110','00001','10001','01110'],
+  '4': ['00010','00110','01010','10010','11111','00010','00010'], '5': ['11111','10000','11110','00001','00001','10001','01110'],
+  '6': ['00110','01000','10000','11110','10001','10001','01110'], '7': ['11111','00001','00010','00100','01000','01000','01000'],
+  '8': ['01110','10001','10001','01110','10001','10001','01110'], '9': ['01110','10001','10001','01111','00001','00010','01100'],
+  ':': ['0','0','1','0','1','0','0'], '.': ['0','0','0','0','0','0','1'], '-': ['000','000','000','111','000','000','000'],
+  'A': ['01110','10001','10001','11111','10001','10001','10001'], 'D': ['11110','10001','10001','10001','10001','10001','11110'],
+  'E': ['11111','10000','10000','11110','10000','10000','11111'], 'F': ['11111','10000','10000','11110','10000','10000','10000'],
+  'H': ['10001','10001','10001','11111','10001','10001','10001'], 'I': ['01110','00100','00100','00100','00100','00100','01110'],
+  'M': ['10001','11011','10101','10101','10001','10001','10001'], 'N': ['10001','10001','11001','10101','10011','10001','10001'],
+  'O': ['01110','10001','10001','10001','10001','10001','01110'], 'R': ['11110','10001','10001','11110','10100','10010','10001'],
+  'S': ['01111','10000','10000','01110','00001','00001','11110'], 'T': ['11111','00100','00100','00100','00100','00100','00100'],
+  'U': ['10001','10001','10001','10001','10001','10001','01110'], 'W': ['10001','10001','10001','10101','10101','10101','01010'],
+};
+const WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const pad2 = n => String(n).padStart(2, '0');
+
+// ---------- 設定（この端末だけに保存） ----------
+const S = { rot: -90, light: 2, theme: 'auto', end: 0, total: 0 };
+try { Object.assign(S, JSON.parse(localStorage.getItem('bedside') || '{}')); } catch (e) {}
+const save = () => { try { localStorage.setItem('bedside', JSON.stringify(S)); } catch (e) {} };
+
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const rot = document.getElementById('rot'), panel = document.getElementById('panel');
+let W = 0, H = 0;
+
+function layout() {
+  const vw = window.innerWidth, vh = window.innerHeight, side = S.rot !== 0;
+  W = side ? vh : vw; H = side ? vw : vh;
+  rot.style.width = W + 'px'; rot.style.height = H + 'px';
+  rot.style.transform = `translate(-50%, -50%) rotate(${S.rot}deg)`;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  draw();
+}
+
+// ---------- 色：昼は白基調、夜は黒地に暗い赤 ----------
+function palette(now) {
+  const h = now.getHours();
+  const night = S.theme === 'night' || (S.theme === 'auto' && (h >= 22 || h < 6));
+  document.body.classList.toggle('day', !night);
+  const k = [0, .35, .65, 1][S.light];
+  if (night) return { bg: '#000', lit: `rgba(255,59,48,${k})`, dim: `rgba(255,59,48,${k * .55})`, ghost: `rgba(255,59,48,${.05 + k * .03})`, acc: `rgba(255,170,160,${k})` };
+  return { bg: '#f2f1ee', lit: `rgba(13,13,13,${.35 + k * .65})`, dim: `rgba(92,92,89,${.35 + k * .65})`, ghost: 'rgba(13,13,13,.08)', acc: '#ff3b30' };
+}
+
+// ---------- ドット文字を描く ----------
+const cols = t => [...t].reduce((n, c, i) => n + (G[c] ? G[c][0].length : 3) + (i ? 1 : 0), 0);
+function text(t, x, y, p, lit, ghost) {
+  const r = p * .4;
+  [...t].forEach((c, i) => {
+    const g = G[c];
+    if (i) { if (g && t[i - 1] !== ' ') for (let k = 0; k < 7; k++) dot(x + p / 2, y + k * p + p / 2, r, ghost); x += p; }
+    if (!g) { x += 3 * p; return; }
+    for (let k = 0; k < 7; k++) for (let j = 0; j < g[k].length; j++) dot(x + j * p + p / 2, y + k * p + p / 2, r, g[k][j] === '1' ? lit : ghost);
+    x += g[0].length * p;
+  });
+  return x;
+}
+function dot(x, y, r, color) { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+
+// ---------- 画面 ----------
+function draw() {
+  if (!W) return;
+  const now = new Date(), c = palette(now);
+  ctx.fillStyle = c.bg; ctx.fillRect(0, 0, W, H);
+  const m = Math.min(W, H) * .07;
+  const hh = pad2(now.getHours()), mm = pad2(now.getMinutes()), ss = pad2(now.getSeconds());
+  const running = S.end > Date.now();
+  const timerH = running ? Math.min(W, H) * .2 : 0;
+
+  // 日付（左上）
+  const dp = Math.max(3, Math.min(W, H) * .016);
+  text(pad2(now.getMonth() + 1) + '.' + pad2(now.getDate()) + ' ' + WEEK[now.getDay()], m, m, dp, c.dim, c.ghost);
+  const top = m + dp * 7 + m * .6, bottom = H - m - timerH;
+
+  if (H > W * 1.15) {
+    // 縦長の枠：時と分を 2 段に
+    const p = Math.min((W - 2 * m) / 11, (bottom - top) / (7 * 2 + 3 + 4.5));
+    const blockW = 11 * p, x = (W - blockW) / 2, y = top + ((bottom - top) - p * (17 + 4.5)) / 2;
+    text(hh, x, y, p, c.lit, c.ghost);
+    text(mm, x, y + 10 * p, p, c.lit, c.ghost);
+    const sp = p * .32;
+    text(ss, x + blockW - cols(ss) * sp, y + 17 * p + p * .9, sp, c.dim, c.ghost);
+  } else {
+    // 横長の枠：HH:MM を 1 行に、秒を右下に
+    const sp0 = .3, need = 25 + 1.5 + 11 * sp0;
+    const p = Math.min((W - 2 * m) / need, (bottom - top) / 7.5);
+    const sp = p * sp0, total = 25 * p + 1.5 * p + 11 * sp, x = (W - total) / 2, y = top + ((bottom - top) - 7 * p) / 2;
+    const end = text(hh + ':' + mm, x, y, p, c.lit, c.ghost);
+    text(ss, end + 1.5 * p, y + 7 * p - 7 * sp, sp, c.dim, c.ghost);
+  }
+
+  // タイマー（下）：TIMER 残り時間 と、1 分 1 個の点（今の位置だけ赤）
+  if (running) {
+    const left = Math.ceil((S.end - Date.now()) / 1000);
+    const tp = timerH / 7 * .42, y = H - m - timerH + timerH * .05;
+    let x = text('TIMER', m, y, tp * .6, c.dim, c.ghost) + tp * 2;
+    text(Math.floor(left / 60) + ':' + pad2(left % 60), x, y + tp * .6 * 7 - tp * 7, tp, c.lit, c.ghost);
+    const n = Math.min(60, Math.max(1, Math.round(S.total / 60))), done = Math.floor((S.total - left) / S.total * n);
+    const pitch = Math.min((W - 2 * m) / n, tp * 1.4), yy = H - m - pitch;
+    for (let i = 0; i < n; i++) dot(m + i * pitch + pitch / 2, yy + pitch / 2, pitch * .36, i < done ? c.lit : i === done ? c.acc : c.ghost);
+  } else if (S.end && Date.now() - S.end < 60000) {
+    const tp = Math.min(W, H) * .02;
+    text('DONE', m, H - m - tp * 7, tp, c.acc, c.ghost);
+  }
+}
+
+// ---------- タイマーと音 ----------
+let audio = null, rang = false;
+function unlockAudio() { try { if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch (e) {} }
+function beep() {
+  if (!audio) return;
+  for (let i = 0; i < 9; i++) {
+    const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + i * .35 + Math.floor(i / 3) * .6;
+    o.frequency.value = 880; o.connect(g); g.connect(audio.destination);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.25, t + .02); g.gain.linearRampToValueAtTime(0, t + .2);
+    o.start(t); o.stop(t + .22);
+  }
+}
+function startTimer(min) { S.total = min * 60; S.end = Date.now() + S.total * 1000; rang = false; save(); refreshPanel(); draw(); }
+function stopTimer() { S.end = 0; S.total = 0; save(); refreshPanel(); draw(); }
+
+// ---------- 画面を消さない（使えない環境では何もしない） ----------
+let lock = null;
+async function keepAwake() {
+  try { if ('wakeLock' in navigator && !lock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); } } catch (e) { lock = null; }
+  document.getElementById('note').textContent = (lock ? '画面オン：有効。' : '画面オン：この環境では使えません（設定の自動ロックを「なし」に）。')
+    + '夜は 22 時〜6 時（自動のとき）。';
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { lock = null; keepAwake(); draw(); } });
+
+// ---------- 操作パネル ----------
+let hideTimer = 0;
+function refreshPanel() {
+  panel.querySelectorAll('[data-min]').forEach(b => b.classList.toggle('on', S.end > Date.now() && S.total === +b.dataset.min * 60));
+  panel.querySelectorAll('[data-b]').forEach(b => b.classList.toggle('on', +b.dataset.b === S.light));
+  panel.querySelectorAll('[data-r]').forEach(b => b.classList.toggle('on', +b.dataset.r === S.rot));
+  panel.querySelectorAll('[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === S.theme));
+}
+function showPanel() { refreshPanel(); panel.classList.add('show'); clearTimeout(hideTimer); hideTimer = setTimeout(() => panel.classList.remove('show'), 6000); }
+document.getElementById('stage').addEventListener('pointerdown', e => {
+  unlockAudio(); keepAwake();
+  if (!panel.contains(e.target)) { panel.classList.contains('show') ? panel.classList.remove('show') : showPanel(); }
+});
+panel.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.min) startTimer(+b.dataset.min);
+  else if (b.id === 'tstop') stopTimer();
+  else if (b.dataset.b) { S.light = +b.dataset.b; save(); }
+  else if (b.dataset.r !== undefined) { S.rot = +b.dataset.r; save(); layout(); }
+  else if (b.dataset.t) { S.theme = b.dataset.t; save(); }
+  refreshPanel(); draw(); showPanel();
+});
+
+// ---------- 1 秒ごとに描き直す ----------
+function tick() {
+  if (S.end && !rang && Date.now() >= S.end) { rang = true; beep(); }
+  draw();
+  setTimeout(tick, 1000 - (Date.now() % 1000) + 5);
+}
+window.addEventListener('resize', layout);
+layout();
+tick();
+</script>
+</body>
+</html>
