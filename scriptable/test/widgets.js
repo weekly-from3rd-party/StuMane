@@ -16,6 +16,8 @@ const REM = {
 // ---------- HABIT 用の記録 ----------
 const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 const days = list => list.map(k => ymd(T(-k, 0)));
+// 砂時計の記録（開始・終了・見出し）を置く
+const seedHourglass = (start, end, label = '6:00 まで') => { reset(); if (start) { FILES.set('/icloud/hourglass/state.json', JSON.stringify({ start: start.getTime(), end: end.getTime(), label })); } };
 const seedHabit = (rec) => { reset(); if (rec) { FILES.set('/icloud/habit/records.json', JSON.stringify(rec)); } };
 const HAB = {
   A: { '筋トレ': days([0, 1, 2, 3, 4, 6]), '読書': days([1, 2, 3]), '勉強': days([2, 5, 9]) },
@@ -31,6 +33,8 @@ const CASES = {
   'launcher-widget.js': [['1 ページ目', {}], ['2 ページ目', { param: '2' }], ['空ページ', { param: '9' }], ['透明未設定', { param: '透明' }]],
   'tilt-clock-widget.js': [['ちょうど', { now: T(0, 23, 0) }], ['半', { now: T(0, 23, 40) }], ['1 桁', { now: T(0, 7, 40) }], ['右', { now: T(0, 23, 40), param: '右' }],
                            ['時刻', { now: T(0, 23, 40), param: '時刻' }], ['半の印', { now: T(0, 7, 40), param: '半' }]],
+  'hourglass-widget.js': [['動いている', { now: T(1, 2, 0), hg: [T(1, 0), T(1, 6)] }], ['終わった', { now: T(1, 7, 0), hg: [T(1, 0), T(1, 6)] }],
+                          ['待機', { now: T(1, 2, 0), hg: null }], ['左', { now: T(1, 2, 0), hg: [T(1, 0), T(1, 6)], param: '左' }]],
   'habit-widget.js': [['通常', { hab: HAB.A }], ['記録なし', { hab: HAB.NONE }], ['1 つだけ', { hab: HAB.A, param: '読書' }], ['透明未設定', { hab: HAB.A, param: '透明' }]],
 };
 
@@ -41,7 +45,7 @@ const CASES = {
     for (const [dev, cfg] of Object.entries(DEV)) {
       const fams = Object.keys(cfg).filter(k => k !== 'screen' && k !== 'pad').concat(['accessoryCircular', 'accessoryInline']);
       for (const fam of fams) for (const [name, c] of cases) {
-        if (file === 'habit-widget.js') seedHabit(c.hab); else reset();
+        if (file === 'habit-widget.js') seedHabit(c.hab); else if (file === 'hourglass-widget.js') seedHourglass(...(c.hg || [])); else reset();
         const r = await run({ file, family: fam, now: c.now || T(0, 10, 30), screen: cfg.screen, pad: cfg.pad, ...c });
         if (!cfg[fam]) { if (r.errs.length) { bad++; console.log(`NG ${file} ${dev} ${fam} ${name} ${r.errs[0]}`); } continue; }
         const h = H(r.w), w = W(r.w), [lw, lh] = cfg[fam], ok = h <= lh && w <= lw && !r.errs.length;
@@ -192,6 +196,38 @@ const CASES = {
   for (const [h, m] of [[0, 5], [7, 40], [11, 40], [19, 10], [23, 40]]) for (const fam of ['accessoryRectangular', 'accessoryCircular', 'small'])
     for (const param of ['', '右', '時刻', '半,右']) allIn = allIn && inside(tiltImg(await run({ file: 'tilt-clock-widget.js', family: fam, now: T(0, h, m), param })));
   check('TILT どの時刻・形・向きでもドットが枠の中に収まる', allIn && left.size.width === 150 && left.size.height === 62);
+
+  // ---------- HOURGLASS（砂時計） ----------
+  const HG = 'hourglass-widget.js';
+  const hgOut = async (input, now) => { const x = await run({ file: HG, shortcut: input, now }); return x.log.find(l => l.startsWith('output ')); };
+  reset();
+  check('HOURGLASS ショートカット「6:00」を 0:00 に → 360 分で開始', (await hgOut('6:00', T(1, 0, 0))) === 'output 360');
+  r = await run({ file: HG, family: 'medium', now: T(1, 2, 0) });
+  t = dump(r.w);
+  check('HOURGLASS 2:00 時点：残り 4:00:00・67%・00:00 → 06:00', t.includes('{4:00:00') && t.includes('"67%"') && t.includes('"00:00 → 06:00"') && t.includes('"6:00 まで"'), t);
+  check('HOURGLASS 砂 1 粒ぶん（約 13 分）で描き直す', Math.abs(r.w.refreshAfterDate - T(1, 2, 0) - 6 * 3600000 / 28) < 1000);
+  check('HOURGLASS タップでショートカット「砂時計」を開く', r.w.url === 'shortcuts://run-shortcut?name=' + encodeURIComponent('砂時計'));
+  const sandLit = img => img.ops.filter(o => o.c.hex === '#0d0d0d' && o.c.alpha === 1).length;
+  const hgImg = x => x.w.children[0].children.find(c => c.kind === 'image').src;
+  const lit2 = sandLit(hgImg(await run({ file: HG, family: 'medium', now: T(1, 2, 0) })));
+  const lit5 = sandLit(hgImg(await run({ file: HG, family: 'medium', now: T(1, 5, 0) })));
+  check('HOURGLASS 砂の数は上下合わせて 28 のまま', lit2 === 28 && lit5 === 28, lit2 + ' / ' + lit5);
+  check('HOURGLASS 落ちている砂粒だけ赤', hgImg(r).ops.filter(o => o.c.hex === '#ff3b30').length === 1);
+  r = await run({ file: HG, family: 'accessoryInline', now: T(1, 7, 0) });
+  check('HOURGLASS 終わったら DONE（インラインは「終了」）', r.w.children[0].text === '砂時計 06:00 終了', r.w.children[0].text);
+  r = await run({ file: HG, family: 'accessoryInline', now: T(1, 19, 0) });
+  check('HOURGLASS 終わって 12 時間を過ぎたら待機', r.w.children[0].text === '砂時計 待機中');
+  check('HOURGLASS「25」→ 25 分', (await hgOut('25', T(1, 9, 0))) === 'output 25');
+  check('HOURGLASS「7:30」を 8:00 に → 翌日 7:30 まで（1410 分）', (await hgOut('７:30'.replace('７', '7'), T(1, 8, 0))) === 'output 1410');
+  check('HOURGLASS 読めない値は開始しない（0 を返す）', (await hgOut('あとで', T(1, 8, 0))) === 'output 0');
+  check('HOURGLASS「停止」で記録を消す', (await hgOut('停止', T(1, 8, 10))) === 'output 0'
+    && (await run({ file: HG, family: 'accessoryInline', now: T(1, 8, 20) })).w.children[0].text === '砂時計 待機中');
+  seedHourglass(T(1, 0), T(1, 6));
+  const tl = hgImg(await run({ file: HG, family: 'accessoryRectangular', now: T(1, 2, 0), param: '左' }));
+  const tr = hgImg(await run({ file: HG, family: 'accessoryRectangular', now: T(1, 2, 0), param: '右' }));
+  const ctr = (img, f) => img.ops.map(o => f(o.r.x + o.r.width / 2, o.r.y + o.r.height / 2).map(n => n.toFixed(2)).join(',') + o.c.alpha).sort().join(' ');
+  check('HOURGLASS 左・右に回すと 180 度反対向き', ctr(tl, (x, y) => [150 - x, 62 - y]) === ctr(tr, (x, y) => [x, y]));
+  check('HOURGLASS 回した表示は枠の中に収まる', [tl, tr].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)));
 
   // ---------- タップ領域の分割 ----------
   r = await run({ file: 'clock-widget.js', family: 'large', now: new FDate(2026, 9, 5, 10) });

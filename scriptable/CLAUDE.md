@@ -10,7 +10,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 
 - 動作環境：iOS アプリ **Scriptable**（JavaScript でウィジェットを書けるアプリ）
 - 成果物：ウィジェットごとに **1 ファイル**。ユーザーが Scriptable に全文を貼り付けて使う
-  - `today-tomorrow-widget.js`（カレンダー）／`countdown-widget.js`（残り時間＋カウントダウン）／`todo-widget.js`（リマインダー）／`habit-widget.js`（習慣トラッカー）／`clock-widget.js`（時計・世界時計）／`launcher-widget.js`（アプリランチャー）／`tilt-clock-widget.js`（90 度回した時計・ロック画面用）
+  - `today-tomorrow-widget.js`（カレンダー）／`countdown-widget.js`（残り時間＋カウントダウン）／`todo-widget.js`（リマインダー）／`habit-widget.js`（習慣トラッカー）／`clock-widget.js`（時計・世界時計）／`launcher-widget.js`（アプリランチャー）／`tilt-clock-widget.js`（90 度回した時計・ロック画面用）／`hourglass-widget.js`（iOS タイマーと連動する砂時計）
 - 全体の目的：待受（ロック画面）・ホーム画面・アプリアイコン・ウィジェットを、同じデザイン言語で一から作り直すこと。ウィジェットはその一部
 
 ## 2. ユーザーが明示したルール
@@ -32,6 +32,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 |---|---|
 | 待受（ロック画面）背景 | 完了：`assets/wallpaper/` に iPhone 用 1290×2796・iPad 用 1668×2388 |
 | ウィジェット | 完了：小・中・大・特大（iPad）・ロック画面 3 種、透明背景、暗色、カレンダー絞り込み。ユーザーが実機で使用中 |
+| HOURGLASS（砂時計） | 作成済み・**実機未確認**（2026-10-06）。ショートカット「砂時計」が必要（`HOURGLASS.md`）。仕様は 4.5 章 |
 | TILT（90 度回した時計） | 作成済み・**実機未確認**（2026-10-06）。仕様は 4.5 章の TILT |
 | ベッドサイド時計（`/bedside/`） | 公開済み。ユーザーの元の意図（ロック画面のウィジェット）とは違ったが、ユーザーの判断で残す |
 | 追加ウィジェット 5 本 | 作成済み・**実機未確認**（2026-10-05〜06）：COUNTDOWN / TODO / HABIT / CLOCK / LAUNCHER。仕様は 4.5 章 |
@@ -110,6 +111,14 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 - Parameter `右` で右に 90 度。ホーム画面の小・中・大にも置ける（白基調のカード）
 - テスト環境の DrawContext は塗ったドットを記録する（`ascii()` で文字の絵にできる）。左右が 180 度反対の位置になること・枠からはみ出さないことを検査している
 
+### HOURGLASS（`hourglass-widget.js`・2026-10-06 ユーザー依頼・デザイン承認済み）
+- **Scriptable は時計アプリのタイマーを読めない**。そこでショートカット「砂時計」が、①メニューで時間を選ぶ →②このスクリプトを Run Script（`args.shortcutParameter` に `6:00`／`25`／`停止`）→ スクリプトが iCloud の `hourglass/state.json` に開始・終了を記録し、`Script.setShortcutOutput(分)` で分を返す →③「タイマーを開始」をその分で実行、の順で連動させる。手順は `HOURGLASS.md`
+- 時計アプリ側で止めても伝わらない（ショートカットの「停止」で記録を消す）。時刻指定は次に来るその時刻まで。分は時計アプリに合わせて整数にそろえる
+- 砂時計は 9×15 ドット（`HG_W` が各段の中の幅、上下 28 粒ずつ）。上の砂はくびれ側から、下は底から中央寄りに詰める。落ちている砂粒 1 つだけ赤（ホーム画面）。ロック画面は白の濃淡
+- 残り時間は `addDate(終了)`＋`applyTimerStyle()`（未来の時刻なのでカウントダウン）。状態は run／done（終了後 12 時間）／idle
+- 描き直しは砂 1 粒ぶん（全体÷28、最短 5 分）か終了時刻。タップはショートカットを開く（`shortcuts://run-shortcut?name=砂時計`）
+- サイズ：長方形＝砂時計（間隔 4pt・高さ 60）＋見出し・残り時間・終了時刻／円形＝砂時計だけ／インライン＝「砂時計 06:00 まで」／小・中・大（中・大は LEFT ％つき）。Parameter `左`・`右` で砂時計と 30 分刻みのドット数字をまとめて 90 度回す（長方形・小）
+
 ### タップ領域の分割（2026-10-06・ユーザー承認済み）
 - 小とロック画面は iOS の仕様でウィジェット全体に 1 つの URL しか持てない。中・大・特大はスタックごとに `url` を持てる
 - TODO：明日の区切り・行・欄 → `calshow:` の明日（今日はリマインダー）。COUNTDOWN：今年の残り・REMAINING 欄 → `calshow:` の今日（カウントダウンの行はその日）
@@ -162,13 +171,15 @@ habit-widget.js               習慣トラッカー
 clock-widget.js               時計・世界時計
 launcher-widget.js            アプリランチャー
 tilt-clock-widget.js          90 度回した時計（ロック画面用・30 分刻み）
+hourglass-widget.js           iOS タイマーと連動する砂時計
+HOURGLASS.md                  砂時計のショートカットの作り方（ユーザー向け）
 CLAUDE.md                     この文書
 package.json                  npm test / npm run dump
 test/harness.js               Scriptable API の模擬環境（型・プロパティ名の検査つき）
 test/data.js                  テスト用の予定データ
 test/fit.js                   機種別の収まり検査
 test/regress.js               回帰テスト
-test/widgets.js               追加ウィジェット（5 本＋TILT）の収まり検査と回帰テスト
+test/widgets.js               追加ウィジェット（5 本＋TILT＋HOURGLASS）の収まり検査と回帰テスト
 test/dump.js                  ウィジェットの中身をツリー表示（デバッグ用）
 assets/wallpaper/             待受背景 PNG（iPhone・iPad）
 design/nothing-white-v3.html  承認済みモック（ロック／ホーム画面・アイコンの線画）
@@ -208,7 +219,7 @@ Scriptable はパソコンで動かないため、`test/harness.js` に Scriptab
 
 - `npm test` は `test/fit.js`・`test/regress.js`・`test/widgets.js` を実行する。失敗すると終了コード 1
 - `widgets.js`：追加 5 本を 5 機種 × 全サイズ（ロック画面含む）× ケースで収まり検査し、残り日数・毎年の日付・並び順・LATE・連続日数・タップでの記録／取り消し・過去の修正を確かめる
-- `harness.js` の `run({ file })` で対象ファイルを選ぶ。リマインダー（`reminders` / `remFail`）、iCloud ファイル、`queryParameters`（`query`）、`URLScheme`、`WidgetDate`（`addDate`）、`SFSymbol`、`Safari.open` の模擬あり。URL は「スキーム:」で始まり空白がなければ通す（calshow は秒数、scriptable は run?scriptName= の形を検査）。収まりの見積もり `H` / `W` と機種表 `DEV` も harness にある
+- `harness.js` の `run({ file })` で対象ファイルを選ぶ。`run({ shortcut: '6:00' })` でショートカットからの実行を模擬（`args.shortcutParameter`、出力は log の `output …`）。リマインダー（`reminders` / `remFail`）、iCloud ファイル、`queryParameters`（`query`）、`URLScheme`、`WidgetDate`（`addDate`）、`SFSymbol`、`Safari.open` の模擬あり。URL は「スキーム:」で始まり空白がなければ通す（calshow は秒数、scriptable は run?scriptName= の形を検査）。収まりの見積もり `H` / `W` と機種表 `DEV` も harness にある
 - `fit.js`：5 機種 × 全サイズ × 8 ケース（通常・今日 1 件・夜・予定過多・長文・空・権限なし・透明未設定）で、高さと省略できない幅が枠に収まるかを見積もる
 - `regress.js`：透明背景の検出がピクセル単位で一致するか（色ずれ・角丸・紫やマゼンタ系アイコンを含む合成スクショ）、絞り込み、時刻表記、アプリ内プレビュー
 - `node test/dump.js medium ONE 16:00`：ウィジェットの中身をツリー表示する（引数はサイズ・データ・時刻・Parameter）

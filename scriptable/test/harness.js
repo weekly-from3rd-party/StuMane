@@ -85,7 +85,7 @@ function validate(n, p = 'W') {
     n.children.forEach((c, i) => e.push(...validate(c, p + '/' + i))); }
   return e;
 }
-const timerText = n => { const t = Math.max(0, Math.floor((FIXED - n.date.getTime()) / 1000)), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = t % 60;
+const timerText = n => { const t = Math.abs(Math.floor((FIXED - n.date.getTime()) / 1000)), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = t % 60;
   return (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(sec).padStart(2, '0'); };
 function dump(n, ind = '') {
   if (n.kind === 'date') return ind + `{${n.style === 'timer' ? timerText(n) : n.style} ${n.font.name.replace('SystemFont', '').replace('Monospaced', 'Mono')} ${n.font.size}${n.textColor ? ' ' + n.textColor : ''}}\n`;
@@ -123,11 +123,12 @@ async function run(o) {
     URLScheme: { forRunningScript: () => 'scriptable:///run?scriptName=' + encodeURIComponent(o.scriptName || 'Widget') },
     Photos: { fromLibrary: () => photos.length ? Promise.resolve(photos.shift()) : Promise.reject(new Error('cancel')) },
     CalendarEvent: { between: async (s, e) => { if (o.fail) throw new Error('denied'); return (o.events || []).filter(v => v.endDate > s && v.startDate < e); } },
-    Script: { setWidget(w) { setW = w; }, complete() { log.push('complete'); } },
-    config: { runsInApp: !!o.app, runsInWidget: !o.app, widgetFamily: o.app ? null : o.family }, args: { widgetParameter: o.param || null, queryParameters: o.query || {} },
+    Script: { setWidget(w) { setW = w; }, complete() { log.push('complete'); }, setShortcutOutput(v) { log.push('output ' + JSON.stringify(v)); } },
+    config: { runsInApp: !!o.app, runsInWidget: !o.app && o.shortcut === undefined, runsWithSiri: false, widgetFamily: o.app || o.shortcut !== undefined ? null : o.family },
+    args: { widgetParameter: o.param || null, queryParameters: o.query || {}, shortcutParameter: o.shortcut === undefined ? null : o.shortcut },
     Device: { isPad: () => !!o.pad, screenSize: () => new Size(scr[0], scr[1]) } });
   await vm.runInContext('(async () => {\n' + SRC(o.file) + '\n})()', ctx, { filename: o.file || 'widget.js' });
-  const w = setW || (o.app ? null : made);
+  const w = setW || (o.app || o.shortcut !== undefined ? null : made);
   return { w, log, errs: w ? validate(w) : [] };
 }
 function shot(W, H, rects, rgb, name, icons = []) {
