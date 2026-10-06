@@ -29,6 +29,7 @@
        icon  … SF Symbols の名前（「SF Symbols」アプリで探せます）
        url   … 開く URL（"calshow:" はカレンダーの今日）
        style … "invert"（黒地に白）/ "accent"（赤）/ 省略（白地に黒）
+       image … 自分で選んだ画像（▶ →「アプリを編集」→ アイコン →「写真から選ぶ」で入る）
      URL で開けないアプリは、ショートカットアプリで「App を開く」だけの
      ショートカットを作り、url を "shortcuts://run-shortcut?name=名前" にします。
 
@@ -143,6 +144,7 @@ async function makeWidget(family, setName) {
   const g = GRID[family] || GRID.medium;
   const per = g.cols * g.rows;
   const apps = set.apps.slice((PAGE - 1) * per, PAGE * per);
+  await loadIcons(apps);
 
   if (family === "small") {
     w.setPadding(13, 14, 12, 14);
@@ -205,13 +207,20 @@ function addTile(parent, app, g, now, tap) {
   tile.size = new Size(g.icon, g.icon);
   tile.cornerRadius = Math.round(g.icon * 0.28);
   tile.centerAlignContent();
-  tile.backgroundColor = app.style === "invert" ? P.ink : P.ghost;
-  tile.addSpacer();
-  const img = tile.addImage(symbol(app.icon, g.icon));
-  const s = Math.round(g.icon * 0.5);
-  img.imageSize = new Size(s, s);
-  img.tintColor = app.style === "invert" ? P.bg : app.style === "accent" ? P.accent : P.ink;
-  tile.addSpacer();
+  const photo = app.image ? ICON_CACHE[app.image] : null;
+  if (photo) {
+    // 自分で選んだ画像：タイルいっぱいに角丸で
+    const img = tile.addImage(photo);
+    img.imageSize = new Size(g.icon, g.icon);
+  } else {
+    tile.backgroundColor = app.style === "invert" ? P.ink : P.ghost;
+    tile.addSpacer();
+    const img = tile.addImage(symbol(app.icon, g.icon));
+    const s = Math.round(g.icon * 0.5);
+    img.imageSize = new Size(s, s);
+    img.tintColor = app.style === "invert" ? P.bg : app.style === "accent" ? P.accent : P.ink;
+    tile.addSpacer();
+  }
   top.addSpacer();
   t.addSpacer(4);
   const l = centerLine(t, String(app.label || ""), mono(g.label, "medium"));
@@ -331,6 +340,49 @@ async function loadSets() {
   }
 }
 
+// 自分で選んだ画像（iCloud の launcher/icons/）。ファイル名 → Image
+const ICON_CACHE = {};
+
+function iconPath(fm, name) {
+  return fm.joinPath(fm.joinPath(fm.joinPath(fm.documentsDirectory(), DIR), "icons"), name);
+}
+
+async function loadIcons(apps) {
+  const fm = store();
+  for (const a of apps) {
+    if (!a.image || ICON_CACHE[a.image]) continue;
+    const p = iconPath(fm, a.image);
+    if (!fm.fileExists(p)) continue;
+    try {
+      await fm.downloadFileFromiCloud(p);
+      ICON_CACHE[a.image] = fm.readImage(p);
+    } catch (e) {
+      // 読めなければ SF Symbols のアイコンで表示する
+    }
+  }
+}
+
+// 写真から選ぶ → 真ん中を正方形に切り抜いて 180px に縮め、保存する。ファイル名を返す
+async function pickIconImage() {
+  const photo = await pickPhoto();
+  if (!photo) return null;
+  const side = Math.min(photo.size.width, photo.size.height), out = 180;
+  const k = out / side;
+  const dc = new DrawContext();
+  dc.size = new Size(out, out);
+  dc.respectScreenScale = false;
+  dc.opaque = true;
+  dc.drawImageInRect(photo, new Rect(-(photo.size.width - side) / 2 * k, -(photo.size.height - side) / 2 * k, photo.size.width * k, photo.size.height * k));
+  const img = dc.getImage();
+  const fm = store();
+  const dir = fm.joinPath(fm.joinPath(fm.documentsDirectory(), DIR), "icons");
+  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+  const name = "icon-" + Date.now().toString(36) + ".png";
+  fm.writeImage(iconPath(fm, name), img);
+  ICON_CACHE[name] = img;
+  return name;
+}
+
 function saveSets(sets) {
   const fm = store();
   const dir = fm.joinPath(fm.documentsDirectory(), DIR);
@@ -350,6 +402,7 @@ const UI = { ink: new Color("#0d0d0d"), dim: new Color("#5c5c59"), faint: new Co
 
 async function editMenu() {
   const sets = await loadSets();
+  await loadIcons(sets.flatMap(x => x.apps));
   const st = { sets, cur: Math.max(0, sets.findIndex(x => x.name === SET_NAME)) };
   const table = new UITable();
   table.showSeparators = true;
@@ -408,9 +461,9 @@ function drawEditor(table, st) {
 
 // アイコン・表示名・日本語名（と色の説明）のセル
 function appCells(row, app, textWeight) {
-  const img = row.addImage(symbol(app.icon, 44));
+  const img = row.addImage(app.image && ICON_CACHE[app.image] ? ICON_CACHE[app.image] : symbol(app.icon, 44));
   img.widthWeight = 12;
-  const note = app.style === "invert" ? "・黒地" : app.style === "accent" ? "・赤" : "";
+  const note = app.image ? "・自分の画像" : app.style === "invert" ? "・黒地" : app.style === "accent" ? "・赤" : "";
   const t = row.addText(app.label, appName(app) + note);
   t.widthWeight = textWeight;
   t.titleFont = Font.semiboldMonospacedSystemFont(15);
@@ -584,8 +637,8 @@ async function customApp() {
   const label = await askText("表示名", "英大文字 6 文字くらいまでが収まります。", "", "例：NOTES");
   if (label === null) return null;
   app.label = (label || "APP").toUpperCase();
-  app.icon = await askIcon(app.icon);
-  app.style = await askStyle(app.style);
+  await askIcon(app);
+  if (!app.image) app.style = await askStyle(app.style);   // 自分の画像なら色はいらない
   return app;
 }
 
@@ -602,7 +655,7 @@ async function changeApp(app) {
     if (!t) return false;
     app.url = t;
   } else if (i === 2) {
-    app.icon = await askIcon(app.icon);
+    await askIcon(app);
   } else {
     app.style = await askStyle(app.style);
   }
@@ -610,14 +663,23 @@ async function changeApp(app) {
   return true;
 }
 
-async function askIcon(current) {
-  const k = await sheet("アイコン（いま：" + current + "）", ["そのまま", "SF Symbols の名前を入力"].concat(ICONS));
-  if (k <= 0) return current;
+// アイコン：写真から選ぶ（自分の画像）か、SF Symbols の線画。app を直接書き換える
+async function askIcon(app) {
+  const now = app.image ? "自分の画像" : app.icon;
+  const k = await sheet("アイコン（いま：" + now + "）", ["そのまま", "写真から選ぶ（自分の画像）", "SF Symbols の名前を入力"].concat(ICONS));
+  if (k <= 0) return;
   if (k === 1) {
-    const t = await askText("SF Symbols の名前", "「SF Symbols」アプリで探せます。例：book.closed", current, "名前");
-    return t || current;
+    const name = await pickIconImage();
+    if (name) app.image = name;
+    return;
   }
-  return ICONS[k - 2];
+  if (k === 2) {
+    const t = await askText("SF Symbols の名前", "「SF Symbols」アプリで探せます。例：book.closed", app.icon, "名前");
+    if (t) { app.icon = t; delete app.image; }
+    return;
+  }
+  app.icon = ICONS[k - 3];
+  delete app.image;
 }
 
 async function askStyle(current) {

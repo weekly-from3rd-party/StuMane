@@ -1,5 +1,5 @@
 // COUNTDOWN / TODO / HABIT の検査：機種別の収まり（5 機種 × 全サイズ × ケース）と、計算・記録の回帰テスト
-const { run, dump, FDate, FILES, reset, H, W, DEV, ascii } = require('./harness');
+const { run, dump, FDate, FILES, reset, H, W, DEV, ascii, shot } = require('./harness');
 let fail = 0; const check = (n, ok, x = '') => { if (!ok) fail++; console.log((ok ? 'OK  ' : 'NG  ') + n + (x ? '  ' + x : '')); };
 const T = (d, h, m = 0) => new FDate(2026, 9, 5 + d, h, m);   // 基準日 2026-10-05（月）
 
@@ -252,7 +252,7 @@ const CASES = {
   // ui：開いた一覧画面ごとの操作。tap(table, 文字) で行を選ぶ、btn(table, 文字, ボタン) で行のボタンを押す
   const tap = (tb, text) => { const r = tb.find(text); return r.onSelect(tb.rows.indexOf(r)); };
   const btn = (tb, text, b) => tb.find(text).cells.find(c => c.type === 'button' && c.title === b).onTap();
-  const edit = (ui, opt = {}) => run({ file: L, app: true, now: T(1, 10), sheets: [1].concat(opt.sheets || []), texts: opt.texts, alerts: opt.alerts, ui });
+  const edit = (ui, opt = {}) => run({ file: L, app: true, now: T(1, 10), sheets: [1].concat(opt.sheets || []), texts: opt.texts, alerts: opt.alerts, photos: opt.photos, ui });
   reset();
   let seen = [];
   await edit([async tb => { seen = tb.lines(); }]);
@@ -273,9 +273,24 @@ const CASES = {
   check('LAUNCHER ✕ で外す', (await lUrls('勉強')).join(' ') === 'notion://');
   // 自分で入れる（URL）
   await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '＋ 自分で入れる'); }],
-    { sheets: [0, 0, 4, 1], texts: ['myapp://', 'my'] });
+    { sheets: [0, 0, 5, 1], texts: ['myapp://', 'my'] });
   r = await run({ file: L, family: 'medium', now: T(1, 10), param: '勉強' });
   check('LAUNCHER 自分で入れる（URL・表示名・アイコン・色）', urls(r.w).join(' ') === 'notion:// myapp://' && dump(r.w).includes('[SF star 19 #ffffff'), urls(r.w).join(' '));
+  // アイコンを写真から選ぶ（自分で入れるとき・変更するとき）
+  const pic = shot(1200, 800, [], [0, 0, 0], 'myphoto');
+  await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '＋ 自分で入れる'); }],
+    { sheets: [0, 1, 1], texts: ['ゲーム', 'game'], photos: [pic] });
+  const sets = JSON.parse(FILES.get('/icloud/launcher/sets.json')), mine = sets.find(x => x.name === '勉強').apps.find(a => a.label === 'GAME');
+  const saved = mine && FILES.get('/icloud/launcher/icons/' + mine.image);
+  check('LAUNCHER 自分で入れる：ショートカット＋写真から選んだ画像（正方形 180px に切り抜いて保存）', !!saved && saved.size.width === 180 && saved.size.height === 180
+    && mine.url === 'shortcuts://run-shortcut?name=' + encodeURIComponent('ゲーム') && !mine.style, JSON.stringify(mine));
+  r = await run({ file: L, family: 'medium', now: T(1, 10), param: '勉強' });
+  const tiles = n => (n.children || []).flatMap(c => (c.kind === 'image' ? [c] : tiles(c)));
+  check('LAUNCHER 自分の画像はタイルいっぱいに表示（線画・地の色なし）', tiles(r.w).some(i => !i.symbol && i.imageSize.width === 38), dump(r.w).split('\n').filter(l => l.includes('[')).slice(-3).join(' / '));
+  await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, 'GAME'); }], { sheets: [0, 2, 5] });
+  check('LAUNCHER アイコンを線画に戻すと画像は外れる', !JSON.parse(FILES.get('/icloud/launcher/sets.json')).find(x => x.name === '勉強').apps.find(a => a.label === 'GAME').image);
+  await edit([async tb => { await tap(tb, 'セット：すべて'); btn(tb, 'GAME', '✕'); }], { sheets: [0] });
+
   // 名前変更・使えない名前・削除・初期化
   await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, 'セット：勉強'); }], { sheets: [0, 2], texts: ['学校'] });
   check('LAUNCHER セットの名前を変える（古い名前は最初のセットになる）', (await lUrls('学校')).length === 2 && (await lUrls('勉強')).length === 8);

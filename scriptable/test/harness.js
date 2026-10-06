@@ -19,6 +19,7 @@ class DrawContext {
   strokeEllipse(r) { if (!(r instanceof Rect)) throw new TypeError('strokeEllipse'); }
   setStrokeColor(c) { if (!(c instanceof Color)) throw new TypeError('stroke'); }
   setLineWidth(n) { if (!num(n)) throw new TypeError('lineWidth'); }
+  drawImageInRect(img, r) { if (!img || !img.__img || !(r instanceof Rect)) throw new TypeError('drawImageInRect'); this.drawn = { img, pt: new Point(r.x, r.y) }; }
   drawImageAtPoint(img, pt) { if (!img || !img.__img || !(pt instanceof Point)) throw new TypeError('drawImage'); this.drawn = { img, pt }; }
   getImage() { if (!(this.size instanceof Size)) throw new TypeError('dc.size');
     return { __img: true, size: this.size, ops: this.ops || [], crop: this.drawn ? { src: this.drawn.img.name, x: -this.drawn.pt.x, y: -this.drawn.pt.y, w: this.size.width, h: this.size.height } : null }; }
