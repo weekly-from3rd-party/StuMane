@@ -15,7 +15,7 @@
         止めたり変えたりしてもウィジェットには伝わりません。止めるときは
         ショートカットで「停止」も選んでください。
 
-   ショートカットに渡す値（Run Script の Parameter）
+   ショートカットに渡す値（Run Script の Parameter）。開始したときだけ「分」を返す
      6:00    … 次の 6:00 まで（「7:30」など、ほかの時刻でも可）
      25      … 25 分
      停止    … 記録を消す（時計アプリのタイマーは自分で止める）
@@ -452,9 +452,10 @@ async function chooseAction() {
 // 実行（ファイルの最後に置くこと）
 // ============================================================
 if (args.shortcutParameter !== undefined && args.shortcutParameter !== null && !config.runsInWidget) {
-  // ショートカットから呼ばれた：記録して、タイマーに渡す分を返す
+  // ショートカットから呼ばれた：記録して、タイマーに渡す分を返す。
+  // 停止・読めない値のときは何も返さない（ショートカットの「もし」は「値がある」で判定できる）
   const r = startFrom(args.shortcutParameter, new Date());
-  Script.setShortcutOutput(r.minutes);
+  if (r.minutes > 0) Script.setShortcutOutput(r.minutes);
 } else {
   const family = config.widgetFamily || (config.runsInApp ? await chooseAction() : "accessoryRectangular");
   if (family === "run") {

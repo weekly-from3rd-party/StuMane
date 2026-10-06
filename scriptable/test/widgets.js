@@ -199,7 +199,7 @@ const CASES = {
 
   // ---------- HOURGLASS（砂時計） ----------
   const HG = 'hourglass-widget.js';
-  const hgOut = async (input, now) => { const x = await run({ file: HG, shortcut: input, now }); return x.log.find(l => l.startsWith('output ')); };
+  const hgOut = async (input, now) => { const x = await run({ file: HG, shortcut: input, now }); return x.log.find(l => l.startsWith('output ')) || 'output なし'; };
   reset();
   check('HOURGLASS ショートカット「6:00」を 0:00 に → 360 分で開始', (await hgOut('6:00', T(1, 0, 0))) === 'output 360');
   r = await run({ file: HG, family: 'medium', now: T(1, 2, 0) });
@@ -227,8 +227,8 @@ const CASES = {
   check('HOURGLASS 長さの書き方（25分→25／1時間→60／1.5時間→90／1時間30分→90）',
     [await hgOut('25分', T(1, 9, 0)), await hgOut('1時間', T(1, 9, 0)), await hgOut('1.5時間', T(1, 9, 0)), await hgOut('1時間30分', T(1, 9, 0))].join(' ')
       === 'output 25 output 60 output 90 output 90');
-  check('HOURGLASS 読めない値は開始しない（0 を返す）', (await hgOut('あとで', T(1, 8, 0))) === 'output 0');
-  check('HOURGLASS「停止」で記録を消す', (await hgOut('停止', T(1, 8, 10))) === 'output 0'
+  check('HOURGLASS 読めない値は開始しない（何も返さない）', (await hgOut('あとで', T(1, 8, 0))) === 'output なし');
+  check('HOURGLASS「停止」で記録を消す（何も返さない）', (await hgOut('停止', T(1, 8, 10))) === 'output なし'
     && (await run({ file: HG, family: 'accessoryInline', now: T(1, 8, 20) })).w.children[0].text === '砂時計 待機中');
   seedHourglass(T(1, 0), T(1, 6));
   const tl = hgImg(await run({ file: HG, family: 'accessoryRectangular', now: T(1, 2, 0), param: '左' }));
