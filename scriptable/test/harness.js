@@ -102,7 +102,10 @@ async function run(o) {
   class ListWidget extends WidgetStack { constructor() { super(); this.kind = 'widget'; this.dir = 'v'; made = this; }
     presentSmall() { log.push('presentSmall'); return Promise.resolve(); } presentMedium() { log.push('presentMedium'); return Promise.resolve(); }
     presentLarge() { log.push('presentLarge'); return Promise.resolve(); } presentExtraLarge() { log.push('presentExtraLarge'); return Promise.resolve(); } presentAccessoryRectangular() { log.push('presentRect'); return Promise.resolve(); } }
-  class Alert { constructor() { this.actions = []; } addAction(a) { if (typeof a !== 'string') throw new TypeError('addAction'); this.actions.push(a); } addDestructiveAction(a) { this.addAction(a); } addCancelAction() {}
+  const texts = (o.texts || []).slice();
+  class Alert { constructor() { this.actions = []; this.fields = []; }
+    addTextField(ph, t) { if (ph !== undefined && typeof ph !== 'string') throw new TypeError('addTextField'); this.fields.push(t === undefined ? '' : String(t)); return {}; }
+    textFieldValue(i) { if (!Number.isInteger(i) || i >= this.fields.length) throw new TypeError('textFieldValue'); return texts.length ? texts.shift() : this.fields[i]; } addAction(a) { if (typeof a !== 'string') throw new TypeError('addAction'); this.actions.push(a); } addDestructiveAction(a) { this.addAction(a); } addCancelAction() {}
     presentSheet() { log.push('sheet「' + this.title + '」' + this.actions.join('|')); return Promise.resolve(sheets.length ? sheets.shift() : -1); }
     presentAlert() { log.push('alert「' + this.title + '」' + (this.message || '')); return Promise.resolve(alerts.length ? alerts.shift() : 0); } }
   // リマインダー：o.reminders = [{ title, dueDate, dueDateIncludesTime, isCompleted, completionDate, priority, calendar: { title } }]

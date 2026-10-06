@@ -104,6 +104,28 @@ const CASES = {
   r = await run({ file: 'habit-widget.js', app: true, now: T(0, 22), sheets: [1, 2, 3] });
   r = await run({ file: 'habit-widget.js', family: 'large', now: T(0, 22, 30) });
   check('HABIT 過去 7 日の記録を直す（勉強の 10/02 を付ける → 連続 0 のまま・28 日中 4）', dump(r.w).includes('"4/28"'));
+  // 習慣の編集（▶ メニューの位置：記録 0 / 修正 1 / 編集 2）
+  seedHabit(HAB.A);
+  const names = async () => { const x = await run({ file: 'habit-widget.js', family: 'large', now: T(0, 12) }); return [...dump(x.w).matchAll(/"([^"]+)"  <medium 14.5/g)].map(m => m[1]); };
+  r = await run({ file: 'habit-widget.js', app: true, now: T(0, 12), sheets: [2, 0], texts: ['ストレッチ, 朝'] });
+  check('HABIT 編集：追加（カンマは空白に）', (await names()).join('/') === '筋トレ/読書/勉強/ストレッチ 朝', (await names()).join('/'));
+  r = await run({ file: 'habit-widget.js', app: true, now: T(0, 12), sheets: [2, 1, 1], texts: ['読書30分'] });
+  t = dump((await run({ file: 'habit-widget.js', family: 'large', now: T(0, 12) })).w);
+  check('HABIT 編集：名前を変えても記録を引き継ぐ（読書30分 3日）', /読書30分[\s\S]*?"3日"/.test(t) && !t.includes('"読書"'));
+  r = await run({ file: 'habit-widget.js', app: true, now: T(0, 12), sheets: [2, 2, 3, 0] });
+  check('HABIT 編集：並べ替え（いちばん上へ）', (await names())[0] === 'ストレッチ 朝', (await names()).join('/'));
+  r = await run({ file: 'habit-widget.js', app: true, now: T(0, 12), sheets: [2, 3, 1], alerts: [0, 0] });
+  check('HABIT 編集：削除', (await names()).join('/') === 'ストレッチ 朝/読書30分/勉強', (await names()).join('/'));
+  r = await run({ file: 'habit-widget.js', app: true, now: T(0, 12), sheets: [2, 0], texts: ['筋トレ'] });
+  t = dump((await run({ file: 'habit-widget.js', family: 'large', now: T(0, 12) })).w);
+  check('HABIT 編集：削除した名前で追加し直すと記録が戻る（筋トレ 5日）', /筋トレ[\s\S]*?"5日"/.test(t));
+  r = await run({ file: 'habit-widget.js', app: true, now: T(0, 12), sheets: [2, 0], texts: ['勉強'] });
+  check('HABIT 編集：同じ名前は追加しない', r.log.some(l => l.includes('同じ名前があります')) && (await names()).length === 4);
+  r = await run({ file: 'habit-widget.js', app: true, now: T(0, 12), query: { habit: '筋トレ' }, alerts: [1] });
+  check('HABIT 編集後の習慣もタップで記録できる', !r.log.some(l => l.includes('見つかりません')), r.log.join(' | '));
+  r = await run({ file: 'habit-widget.js', app: true, now: T(0, 12), query: { habit: '読書' } });
+  check('HABIT 一覧に無い名前のタップは案内を出す', r.log.some(l => l.includes('習慣が見つかりません')));
+
   seedHabit(null);
   r = await run({ file: 'habit-widget.js', family: 'small', now: T(0, 10) });
   t = dump(r.w);

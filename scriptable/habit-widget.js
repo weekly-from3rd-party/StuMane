@@ -15,6 +15,10 @@
      ・Scriptable で ▶ →「今日の記録をつける」／「過去 7 日の記録を直す」
      ※ 記録してからウィジェットに反映されるまで、少しかかることがあります
 
+   習慣の追加・名前の変更・並べ替え・削除
+     Scriptable で ▶ →「習慣を編集」。一覧は iCloud（habit/habits.json）に
+     保存され、iPhone と iPad で共有されます。名前を変えても記録は引き継ぎます。
+
    対応サイズ
      ホーム画面：小 / 中 / 大 / 特大（iPad）
      ロック画面：長方形 / 円形 / インライン
@@ -32,7 +36,7 @@
 // ---------- 設定 ----------
 const CONFIG = {
   theme: "light",                     // "light"（白基調・既定）/ "dark"
-  habits: ["筋トレ", "読書", "勉強"],   // 習慣の名前（上から順に表示。名前が記録の鍵なので、変えると記録が分かれる）
+  habits: ["筋トレ", "読書", "勉強"],   // 最初の習慣（▶ →「習慣を編集」で変えたあとは、そちらの一覧を使う）
 };
 const DIR = "habit";   // 透明背景・記録の保存先フォルダ
 
@@ -41,11 +45,13 @@ const PARAMS = String(args.widgetParameter || "")
   .split(/[,、]/).map(s => s.trim()).filter(Boolean);
 const THEME = PARAMS.map(p => p.toLowerCase()).find(p => p === "dark" || p === "light") || CONFIG.theme;
 const CLEAR = PARAMS.some(p => /^(透明|clear)$/i.test(p));
-const HABITS = (() => {
-  const names = PARAMS.filter(p => !/^(dark|light|透明|clear)$/i.test(p));
-  const pick = CONFIG.habits.filter(h => names.includes(h));
-  return pick.length ? pick : CONFIG.habits;
-})();
+const PICK = PARAMS.filter(p => !/^(dark|light|透明|clear)$/i.test(p));   // 表示する習慣（Parameter）
+
+// 一覧のうち Parameter で選んだものだけ（選んだものが一覧に無ければ全部）
+function shown(list) {
+  const pick = list.filter(h => PICK.includes(h));
+  return pick.length ? pick : list;
+}
 
 // ---------- 色（Nothing デザインテンプレ：白基調） ----------
 const PALETTES = {
@@ -324,7 +330,7 @@ function emptyWidget(w, accessory) {
   w.setPadding(14, 14, 14, 14);
   addText(w, "習慣が設定されていません", sys(14, "semibold"), P.ink).lineLimit = 2;
   w.addSpacer(5);
-  addText(w, "スクリプト冒頭の CONFIG.habits に習慣の名前を書いてください。", sys(12), P.dim).lineLimit = 3;
+  addText(w, "Scriptable で ▶ →「習慣を編集」から追加してください。", sys(12), P.dim).lineLimit = 3;
   return w;
 }
 
@@ -387,7 +393,7 @@ async function loadData() {
   const now = new Date();
   const rec = await loadRecords();
   const today = ymd(now);
-  const habits = HABITS.map(name => {
+  const habits = shown(await loadHabitList()).map(name => {
     const days = new Set(rec[name] || []);
     let month = 0;
     for (let k = 0; k < 28; k++) if (days.has(ymd(dayStart(now, -k)))) month++;
@@ -433,6 +439,31 @@ async function loadRecords() {
   }
 }
 
+// 習慣の一覧（▶ →「習慣を編集」で保存したもの。無ければ CONFIG.habits）
+function habitPath(fm) {
+  return fm.joinPath(fm.joinPath(fm.documentsDirectory(), DIR), "habits.json");
+}
+
+async function loadHabitList() {
+  const fm = store();
+  const p = habitPath(fm);
+  if (!fm.fileExists(p)) return CONFIG.habits.slice();
+  try {
+    await fm.downloadFileFromiCloud(p);
+    const list = JSON.parse(fm.readString(p));
+    return Array.isArray(list) ? list.map(String) : CONFIG.habits.slice();
+  } catch (e) {
+    return CONFIG.habits.slice();
+  }
+}
+
+function saveHabitList(list) {
+  const fm = store();
+  const dir = fm.joinPath(fm.documentsDirectory(), DIR);
+  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+  fm.writeString(habitPath(fm), JSON.stringify(list));
+}
+
 function saveRecords(rec) {
   const fm = store();
   const dir = fm.joinPath(fm.documentsDirectory(), DIR);
@@ -464,8 +495,8 @@ function nextRefresh(D) {
 // ============================================================
 // ウィジェットのタップから：今日の記録をつける（済みなら取り消すか聞く）
 async function recordToday(name) {
-  if (!CONFIG.habits.includes(name)) {
-    await notice("習慣が見つかりません", "「" + name + "」は CONFIG.habits にありません。");
+  if (!(await loadHabitList()).includes(name)) {
+    await notice("習慣が見つかりません", "「" + name + "」は習慣の一覧にありません。▶ →「習慣を編集」で確かめてください。");
     return;
   }
   const D = await loadData();
@@ -490,16 +521,20 @@ async function recordToday(name) {
 // ▶ メニューから：習慣を選んで今日を記録
 async function recordMenu() {
   const D = await loadData();
-  const all = CONFIG.habits.map(name => D.habits.find(h => h.name === name) || { name, done: false });
+  const today = ymd(D.now), rec = await loadRecords();
+  const all = (await loadHabitList()).map(name => ({ name, done: (rec[name] || []).includes(today) }));
+  if (!all.length) return notice("習慣がありません", "▶ →「習慣を編集」から追加してください。");
   const i = await sheet("今日の記録", all.map(h => (h.done ? "✓ " : "○ ") + h.name));
   if (i >= 0) await recordToday(all[i].name);
 }
 
 // ▶ メニューから：過去 7 日のどこかを付け外し
 async function fixMenu() {
-  const i = await sheet("記録を直す習慣", CONFIG.habits);
+  const list = await loadHabitList();
+  if (!list.length) return notice("習慣がありません", "▶ →「習慣を編集」から追加してください。");
+  const i = await sheet("記録を直す習慣", list);
   if (i < 0) return;
-  const name = CONFIG.habits[i];
+  const name = list[i];
   const D = await loadData();
   const days = new Set((await loadRecords())[name] || []);
   const opts = [];
@@ -511,6 +546,86 @@ async function fixMenu() {
   if (j < 0) return;
   await setRecord(name, opts[j].d, !opts[j].on);
   await notice(name, md(opts[j].d) + " の記録を" + (opts[j].on ? "外しました。" : "つけました。"));
+}
+
+// ▶ メニューから：習慣の追加・名前の変更・並べ替え・削除
+async function editMenu() {
+  const list = await loadHabitList();
+  const i = await sheet("習慣を編集（いま " + list.length + " 個）", ["追加する", "名前を変える", "並べ替える", "削除する"]);
+  if (i === 0) return addHabit(list);
+  if (i < 0 || !list.length) return;
+  const j = await sheet(["", "名前を変える習慣", "動かす習慣", "削除する習慣"][i], list);
+  if (j < 0) return;
+  if (i === 1) return renameHabit(list, j);
+  if (i === 2) return moveHabit(list, j);
+  return deleteHabit(list, j);
+}
+
+// 名前の入力（カンマは Parameter の区切りなので使えない）
+async function askName(title, text) {
+  const a = new Alert();
+  a.title = title;
+  a.message = "例：ストレッチ、英単語、早寝";
+  a.addTextField("習慣の名前", text || "");
+  a.addAction("決定");
+  a.addCancelAction("キャンセル");
+  if ((await a.presentAlert()) !== 0) return null;
+  const name = String(a.textFieldValue(0) || "").replace(/[,、]/g, " ").replace(/\s+/g, " ").trim();
+  if (!name) {
+    await notice("名前が空です", "習慣の名前を入れてください。");
+    return null;
+  }
+  return name;
+}
+
+async function addHabit(list) {
+  const name = await askName("習慣を追加");
+  if (!name) return;
+  if (list.includes(name)) return notice("同じ名前があります", "「" + name + "」はもう一覧にあります。");
+  list.push(name);
+  saveHabitList(list);
+  await notice("追加しました", "「" + name + "」を一覧のいちばん下に追加しました。");
+}
+
+// 名前を変えたら記録も新しい名前へ移す
+async function renameHabit(list, j) {
+  const old = list[j];
+  const name = await askName("名前を変える", old);
+  if (!name || name === old) return;
+  if (list.includes(name)) return notice("同じ名前があります", "「" + name + "」はもう一覧にあります。");
+  const rec = await loadRecords();
+  if (rec[old]) {
+    rec[name] = Array.from(new Set((rec[name] || []).concat(rec[old]))).sort();
+    delete rec[old];
+    saveRecords(rec);
+  }
+  list[j] = name;
+  saveHabitList(list);
+  await notice("名前を変えました", "「" + old + "」→「" + name + "」。記録は引き継いでいます。");
+}
+
+async function moveHabit(list, j) {
+  const k = await sheet("「" + list[j] + "」を動かす", ["いちばん上へ", "1 つ上へ", "1 つ下へ", "いちばん下へ"]);
+  if (k < 0) return;
+  const [name] = list.splice(j, 1);
+  const to = [0, Math.max(0, j - 1), Math.min(list.length, j + 1), list.length][k];
+  list.splice(to, 0, name);
+  saveHabitList(list);
+  await notice("並べ替えました", list.map((h, n) => (n + 1) + ". " + h).join("\n"));
+}
+
+// 一覧から外すだけ。記録は残すので、同じ名前で追加すると戻る
+async function deleteHabit(list, j) {
+  const name = list[j];
+  const a = new Alert();
+  a.title = "「" + name + "」を削除しますか？";
+  a.message = "一覧から外します。記録は残るので、同じ名前で追加し直すと元に戻ります。";
+  a.addDestructiveAction("削除する");
+  a.addCancelAction("キャンセル");
+  if ((await a.presentAlert()) !== 0) return;
+  list.splice(j, 1);
+  saveHabitList(list);
+  await notice("削除しました", "「" + name + "」を一覧から外しました。");
 }
 
 // ============================================================
@@ -846,7 +961,7 @@ async function pickPhoto() {
 // アプリ内プレビュー
 // ============================================================
 async function chooseAction() {
-  const opts = [["今日の記録をつける", "record"], ["過去 7 日の記録を直す", "fix"], ["小", "small"], ["中", "medium"], ["大", "large"]];
+  const opts = [["今日の記録をつける", "record"], ["過去 7 日の記録を直す", "fix"], ["習慣を編集", "edit"], ["小", "small"], ["中", "medium"], ["大", "large"]];
   if (Device.isPad()) opts.push(["特大", "extraLarge"]);
   opts.push(["ロック画面（長方形）", "accessoryRectangular"], ["透明背景を設定", "setup-clear"]);
   const i = await sheet("プレビュー・設定", opts.map(o => o[0]));
@@ -877,6 +992,8 @@ if (LINK) {
   await recordMenu();
 } else if (family === "fix") {
   await fixMenu();
+} else if (family === "edit") {
+  await editMenu();
 } else if (family === "setup-clear") {
   await setupClear();
 } else if (family) {
