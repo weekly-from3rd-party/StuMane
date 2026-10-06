@@ -291,7 +291,12 @@ const sc = (label, icon, name, shortcut) => {
   if (shortcut && shortcut !== name) RENAMED[shortcutUrl(name)] = shortcutUrl(shortcut);
   return { label, icon, url: shortcutUrl(shortcut || name), name };
 };
-// 開く先を新しいショートカット名に置き換える。変えたら true
+// moved(表示名, アイコン, URL, 日本語名, 前のショートカット名)＝前はショートカット経由で、URL で直接開くようにしたもの（2026-10-06・URL は推測で実機未確認）
+const moved = (label, icon, url, name, was) => {
+  [name, was].filter(Boolean).forEach(n => { RENAMED[shortcutUrl(n)] = url; });
+  return u(label, icon, url, name);
+};
+// 開く先を新しいショートカット名・URL に置き換える。変えたら true
 function renameUrls(apps) {
   let changed = false;
   apps.forEach(a => { if (RENAMED[a.url]) { a.url = RENAMED[a.url]; changed = true; } });
@@ -312,20 +317,20 @@ const DEFAULT_GROUPS = [
     u("TUNES", "star", "itms://", "iTunes Store"),
     u("ASTORE", "applelogo", "applestore://", "Apple Store"),
     u("SCRIPT", "curlybraces", "scriptable://", "Scriptable"),
-    sc("SAFARI", "safari", "Safari", "アプリを開く 2"),
+    moved("SAFARI", "safari", "x-safari-https://www.google.com", "Safari", "アプリを開く 2"),
     sc("CAM", "camera", "カメラ", "アプリを開く 68"),
     sc("FT", "video", "FaceTime", "アプリを開く 32"),
     sc("PHONE", "phone", "電話", "アプリを開く 107"),
-    sc("PEOPLE", "person.crop.circle", "連絡先"),
-    sc("CALC", "plus.forwardslash.minus", "計算機", "アプリを開く 103"),
+    moved("PEOPLE", "person.crop.circle", "contacts://", "連絡先"),
+    moved("CALC", "plus.forwardslash.minus", "calc://", "計算機", "アプリを開く 103"),
     sc("PASS", "key", "パスワード", "アプリを開く 59"),
-    sc("RULER", "ruler", "計測"),
-    sc("JRNL", "book.closed", "ジャーナル", "アプリを開く 72"),
+    moved("RULER", "ruler", "measure://", "計測"),
+    moved("JRNL", "book.closed", "journal://", "ジャーナル", "アプリを開く 72"),
     sc("PLAY", "wand.and.stars", "Playground", "アプリを開く 43"),
     sc("PREV", "eye", "プレビュー", "アプリを開く 93"),
-    sc("PAGES", "doc.richtext", "Pages"),
-    sc("MOVIE", "film", "iMovie"),
-    sc("CLIPS", "video.badge.plus", "Clips"),
+    moved("PAGES", "doc.richtext", "pages://", "Pages"),
+    moved("MOVIE", "film", "imovie://", "iMovie"),
+    moved("CLIPS", "video.badge.plus", "clips://", "Clips"),
     sc("GAMES", "gamecontroller", "ゲーム"),
     sc("REMOTE", "tv", "リモコン"),
     sc("ICLOUD", "icloud", "iCloud Drive"),
@@ -343,18 +348,18 @@ const DEFAULT_GROUPS = [
     u("ZOOM", "video.circle", "zoomus://", "Zoom"),
     u("OBSDN", "diamond", "obsidian://", "Obsidian"),
     u("GITHUB", "chevron.left.forwardslash.chevron.right", "github://", "GitHub"),
-    sc("STPLUS", "chart.bar", "Studyplus", "アプリを開く 45"),
-    sc("ABCEED", "character.book.closed", "abceed", "アプリを開く"),
+    moved("STPLUS", "chart.bar", "studyplus://", "Studyplus", "アプリを開く 45"),
+    moved("ABCEED", "character.book.closed", "abceed://", "abceed", "アプリを開く"),
     sc("TOEIC", "book.closed", "TOEIC公式教材", "アプリを開く 62"),
     sc("MANABO", "person.2", "manabo"),
-    sc("GEOGB", "function", "GeoGebra"),
+    moved("GEOGB", "function", "geogebra://", "GeoGebra"),
     sc("TORUMI", "doc.viewfinder", "トルミル"),
     sc("WIN", "laptopcomputer", "Windows にリンク", "アプリを開く 65")]],
   ["AI", [
     u("GOOGLE", "magnifyingglass", "google://", "Google"),
     u("GPT", "bubble.left.and.bubble.right", "chatgpt://", "ChatGPT"),
-    sc("GEMINI", "sparkles", "Gemini", "アプリを開く 17"),
-    sc("COPLT", "wand.and.rays", "Copilot"),
+    moved("GEMINI", "sparkles", "googlegemini://", "Gemini", "アプリを開く 17"),
+    moved("COPLT", "wand.and.rays", "ms-copilot://", "Copilot"),
     sc("MANUS", "hand.raised", "Manus", "アプリを開く 38"),
     sc("SPARK", "bolt", "Genspark")]],
   ["SNS・連絡", [
@@ -368,23 +373,23 @@ const DEFAULT_GROUPS = [
     u("YT", "play.rectangle", "youtube://", "YouTube"),
     u("SPOT", "headphones", "spotify://", "Spotify"),
     u("YTM", "music.note.list", "youtubemusic://", "YouTube Music"),
-    sc("JUMP", "book.pages", "ジャンプ+", "アプリを開く 89"),
+    moved("JUMP", "book.pages", "shonenjumpplus://", "ジャンプ+", "アプリを開く 89"),
     sc("SWITCH", "gamecontroller", "Nintendo Switch App"),
     sc("NSTORE", "bag", "Nintendo Store", "アプリを開く 40"),
     sc("CDREC", "opticaldisc", "CDレコ"),
-    sc("IBIS", "paintbrush", "ibisPaint X")]],
+    moved("IBIS", "paintbrush", "ibispaint://", "ibisPaint X")]],
   ["買い物・お金", [
     u("AMZN", "cart", "com.amazon.mobile.shopping://", "Amazon"),
-    sc("RKTN", "bag", "楽天市場", "アプリを開く 102"),
-    sc("ZOZO", "tshirt", "ZOZOTOWN", "アプリを開く 56"),
+    moved("RKTN", "bag", "rakutenichiba://", "楽天市場", "アプリを開く 102"),
+    moved("ZOZO", "tshirt", "zozotown://", "ZOZOTOWN", "アプリを開く 56"),
     sc("MUJI", "house", "MUJI", "アプリを開く 39"),
-    sc("HPB", "scissors", "ホットペッパー", "アプリを開く 95"),
+    moved("HPB", "scissors", "hotpepperbeauty://", "ホットペッパー", "アプリを開く 95"),
     sc("MIZUHO", "building.columns", "みずほ銀行", "アプリを開く 82"),
     sc("YUCHO", "yensign.circle", "ゆうちょ通帳", "アプリを開く 83"),
     sc("UQ", "antenna.radiowaves.left.and.right", "My UQ mobile", "アプリを開く 5")]],
   ["生活・その他", [["MARU", "丸ポップ（ショートカット経由）"],
-    sc("WNEWS", "cloud.sun", "weathernews", "アプリを開く 55"),
-    sc("ALEXA", "speaker.wave.2", "Amazon Alexa"),
+    moved("WNEWS", "cloud.sun", "weathernews://", "weathernews", "アプリを開く 55"),
+    moved("ALEXA", "speaker.wave.2", "alexa://", "Amazon Alexa"),
     sc("SOUND", "earbuds", "Anker soundcore", "アプリを開く 10"),
     sc("NTHX", "headphones", "Nothing X", "アプリを開く 41"),
     sc("RSHIFT", "calendar.badge.clock", "アールシフト", "アプリを開く 67")]],
