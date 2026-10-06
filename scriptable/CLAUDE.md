@@ -140,6 +140,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
   - セット名に数字だけ・dark・light・透明・空は使えない。カンマは空白に。▶ のプレビューはセットが複数あれば選ぶ
   - **自分の画像のアイコン**（2026-10-06 ユーザー依頼）：アイコンの選択肢「写真から選ぶ」→ `Photos.fromLibrary` → 真ん中を正方形に切り抜いて 180px（`drawImageInRect`）→ iCloud の `launcher/icons/icon-<時刻>.png`。アプリに `image`（ファイル名）を持たせ、タイルは地の色・線画なしで画像を角丸のタイルいっぱいに出す（色の選択は聞かない）。線画を選び直すと `image` を外す。表示前に `loadIcons` で読み込む（`ICON_CACHE`）
   - **選択肢の編集**（2026-10-06 ユーザー依頼・承認済み）：追加画面に出す一覧を iCloud の `launcher/catalog.json`（`[{ cat, items: [{ name, label, icon, url, style, image }] }]`）に持つ。無ければ `buildCatalog(sets)` で作る＝`DEFAULT_GROUPS`（Apple のアプリ・勉強・仕事・AI・SNS・連絡・エンタメ・買い物・お金・生活・その他。ユーザーの iPad に入っているアプリ約 90 個を 2026-10-06 に追加。URL 不明のものは `sc()`＝ショートカット「日本語名」経由）＋**今どれかのセットに入っていて一覧に無いアプリすべて**を「自分で追加」に（ユーザー指定）。「初期の選択肢に戻す」も同じ作り方。ファイルは `{ groups, known }`（known＝入れたことのある初期の選択肢の URL）で、開くたびに `mergeDefaults` がコードで増えた初期の選択肢だけを足す（外したものは戻さない。古い配列だけの形も読む）。編集画面（`catalogEditor`）：＋ 選択肢を追加（開く先・日本語名・表示名・アイコン・色・種類。新しい種類も作れる）／種類の行で名前変更・削除／行のタップで変更・種類を移す、↑↓、✕。選択肢を外してもセットの中のアプリはそのまま
+  - **Scriptable を経由せずに開く方法は無い**（ウィジェットのタップは必ず Scriptable を通る。iOS 18 の OpenURLIntent に Scriptable は非対応）。ユーザーの選択（2026-10-06）：よく使うアプリは iOS 標準のショートカットのウィジェット（中 4・大 8 個、`App を開く` で直接開く）、それ以外は LAUNCHER と使い分ける。手順は `LAUNCHER-SHORTCUTS.md`
   - 見本ページ：`design/launcher-editor-mock.html`（編集すると右の中サイズに反映。写真から選ぶはファイル選択で再現）
 
 ## 5. デザイントークン
@@ -184,6 +185,7 @@ launcher-widget.js            アプリランチャー
 tilt-clock-widget.js          90 度回した時計（ロック画面用・30 分刻み）
 hourglass-widget.js           iOS タイマーと連動する砂時計
 HOURGLASS.md                  砂時計のショートカットの作り方（ユーザー向け）
+LAUNCHER-SHORTCUTS.md         よく使うアプリをショートカットのウィジェットに置く手順（ユーザー向け）
 CLAUDE.md                     この文書
 package.json                  npm test / npm run dump
 test/harness.js               Scriptable API の模擬環境（型・プロパティ名の検査つき）
