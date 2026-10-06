@@ -1,0 +1,249 @@
+<title>白基調ウィジェット</title>
+<style>
+/* Layout: 壁紙（ドット格子）の上に、iPhone 標準機の実寸（pt=px）でウィジェットを並べる。ウィジェットごとに 1 セクション */
+:root {
+  --wall: #f2f1ee; --wall-dot: rgba(13,13,13,.07);
+  --card: #ffffff; --ink: #0d0d0d; --dim: #5c5c59;
+  --faint: rgba(13,13,13,.5); --rule: rgba(13,13,13,.16); --ghost: rgba(13,13,13,.08);
+  --accent: #ff3b30;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sys: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --wall: #1b1b1a; --wall-dot: rgba(255,255,255,.07);
+  --card: #0f0f0f; --ink: #f2f2f2; --dim: #a8a8a5;
+  --faint: rgba(242,242,242,.5); --rule: rgba(255,255,255,.18); --ghost: rgba(255,255,255,.08);
+  color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --wall: #1b1b1a; --wall-dot: rgba(255,255,255,.07);
+  --card: #0f0f0f; --ink: #f2f2f2; --dim: #a8a8a5;
+  --faint: rgba(242,242,242,.5); --rule: rgba(255,255,255,.18); --ghost: rgba(255,255,255,.08);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--wall); color: var(--ink); font-family: var(--sys);
+  background-image: radial-gradient(var(--wall-dot) 1.1px, transparent 1.3px); background-size: 14px 14px;
+}
+.page { max-width: 1120px; margin: 0 auto; padding: 40px 16px 64px; display: flex; flex-direction: column; gap: 48px; }
+header.top { display: flex; flex-direction: column; gap: 10px; }
+.eyebrow { font: 600 11px/1.2 var(--mono); letter-spacing: .08em; color: var(--accent); }
+h1 { margin: 0; font: 600 28px/1.25 var(--sys); text-wrap: balance; }
+.lead { margin: 0; max-width: 62ch; font-size: 14px; line-height: 1.7; color: var(--dim); }
+section { display: flex; flex-direction: column; gap: 16px; }
+.sh { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--rule); padding-bottom: 8px; }
+.sh h2 { margin: 0; font: 600 15px/1.2 var(--mono); letter-spacing: .06em; }
+.sh p { margin: 0; font-size: 13px; color: var(--dim); }
+.rack { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+figcaption { font: 500 10.5px/1.2 var(--mono); letter-spacing: .04em; color: var(--faint); }
+
+/* ウィジェット本体（iOS の角丸 22pt） */
+.w { background: var(--card); border-radius: 22px; overflow: hidden; flex: none; display: flex; flex-direction: column;
+     box-shadow: 0 1px 2px rgba(0,0,0,.04); font-variant-numeric: tabular-nums; }
+.s { width: 158px; height: 158px; padding: 13px 14px 12px; }
+.m { width: 338px; height: 158px; padding: 12px 13px 11px; }
+.l { width: 338px; height: 354px; padding: 16px 16px 14px; }
+.row { display: flex; align-items: center; min-width: 0; }
+.col { display: flex; flex-direction: column; min-width: 0; }
+.grow { flex: 1 1 auto; }
+.tx { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.22; }
+.tx.wrap2 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rule-h { height: 1px; background: var(--rule); flex: none; }
+.rule-v { width: 1px; background: var(--rule); align-self: stretch; flex: none; }
+svg.dm { display: block; flex: none; }
+.mark { width: 6px; height: 6px; border-radius: 3px; flex: none; }
+.tile { display: flex; align-items: center; justify-content: center; flex: none; }
+.tile svg { width: 50%; height: 50%; stroke-width: 1.5; }
+.lbl { font: 500 9.5px/1.2 var(--mono); letter-spacing: .02em; }
+.note { font-size: 12px; color: var(--faint); }
+@media (max-width: 420px) { .page { padding-top: 24px; } h1 { font-size: 23px; } }
+</style>
+
+<div class="page">
+  <header class="top">
+    <div class="eyebrow">SCRIPTABLE · NOTHING WHITE</div>
+    <h1>追加ウィジェット 5 本のデザイン案</h1>
+    <p class="lead">iPhone 標準機（393×852pt）の実寸です。見本データで、2026-10-06（火）10:30 時点の表示を再現しています。時計だけは今の時刻で動きます。端末がダークモードのときは、Parameter に <code>dark</code> を入れたときの暗色版で表示します。</p>
+  </header>
+  <div id="app"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.453.0/dist/umd/lucide.min.js"></script>
+<script>
+// ---------- 小道具 ----------
+const C = { ink: 'var(--ink)', dim: 'var(--dim)', faint: 'var(--faint)', acc: 'var(--accent)', ghost: 'var(--ghost)' };
+const tx = (s, size, o = {}) => `<span class="tx ${o.cls || ''}" style="font:${o.w || 400} ${size}px ${o.sys ? 'var(--sys)' : 'var(--mono)'};color:${o.c || C.ink};${o.st || ''}">${s}</span>`;
+const row = (inner, st = '') => `<div class="row" style="${st}">${inner}</div>`;
+const col = (inner, st = '') => `<div class="col" style="${st}">${inner}</div>`;
+const gap = n => `<div style="flex:none;width:${n}px;height:${n}px"></div>`;
+const grow = '<div class="grow"></div>';
+const ruleH = '<div class="rule-h"></div>';
+const ruleV = '<div class="rule-v"></div>';
+const WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const pad2 = n => String(n).padStart(2, '0');
+
+// 5×7 ドットマトリクス（消灯ドットも薄く描く）
+const G = {
+  '0': ['01110','10001','10001','10001','10001','10001','01110'], '1': ['00100','01100','00100','00100','00100','00100','01110'],
+  '2': ['01110','10001','00001','00010','00100','01000','11111'], '3': ['01110','10001','00001','00110','00001','10001','01110'],
+  '4': ['00010','00110','01010','10010','11111','00010','00010'], '5': ['11111','10000','11110','00001','00001','10001','01110'],
+  '6': ['00110','01000','10000','11110','10001','10001','01110'], '7': ['11111','00001','00010','00100','01000','01000','01000'],
+  '8': ['01110','10001','10001','01110','10001','10001','01110'], '9': ['01110','10001','10001','01111','00001','00010','01100'],
+  '.': ['0','0','0','0','0','0','1'], '-': ['000','000','000','111','000','000','000'],
+};
+function dots(text, h, color = C.ink) {
+  const p = h / 7, d = p * .8, gl = [...String(text)].map(c => G[c] || G['-']);
+  let x = 0, out = '';
+  const dot = (cx, r, c) => { out += `<circle cx="${((cx + .5) * p).toFixed(2)}" cy="${((r + .5) * p).toFixed(2)}" r="${(d / 2).toFixed(2)}" style="fill:${c}"/>`; };
+  gl.forEach((g, gi) => {
+    const gw = g[0].length;
+    for (let r = 0; r < 7; r++) for (let c = 0; c < gw; c++) dot(x + c, r, g[r][c] === '1' ? color : C.ghost);
+    x += gw;
+    if (gi < gl.length - 1) { for (let r = 0; r < 7; r++) dot(x, r, C.ghost); x++; }
+  });
+  return `<svg class="dm" width="${(x * p).toFixed(1)}" height="${h}" aria-label="${text}">${out}</svg>`;
+}
+// 点の列：1=点灯 / 0=消灯 / a=赤 / r=輪 / R=赤い輪
+function dotRow(states, pitch) {
+  const d = pitch * .72, o = (pitch - d) / 2, lw = Math.max(1, pitch * .12);
+  const out = states.map((s, i) => {
+    const cx = i * pitch + pitch / 2, cy = pitch / 2;
+    if (s === 'r' || s === 'R') return `<circle cx="${cx}" cy="${cy}" r="${(d - lw) / 2}" style="fill:none;stroke:${s === 'R' ? C.acc : C.ink};stroke-width:${lw}"/>`;
+    return `<circle cx="${cx}" cy="${cy}" r="${d / 2}" style="fill:${s === 1 ? C.ink : s === 'a' ? C.acc : C.ghost}"/>`;
+  }).join('');
+  return `<svg class="dm" width="${states.length * pitch}" height="${pitch}">${out}</svg>`;
+}
+const bar = (ratio, n) => Array.from({ length: n }, (_, i) => (i < Math.round(ratio * n) ? 1 : 0));
+const ring = (size, color) => `<svg class="dm" width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${(size - 1.3) / 2}" style="fill:none;stroke:${color};stroke-width:1.3"/></svg>`;
+const mark = on => `<div class="mark" style="background:${on ? C.acc : 'transparent'}"></div>`;
+const head = (label, right, sub = '', red = false) => col(
+  row(tx(label, 10.5, { w: 600, c: red ? C.acc : C.dim }) + (sub ? gap(8) + tx(sub, 10.5, { c: C.dim }) : '') + grow + (right ? tx(right, 10.5, { c: C.faint }) : '')) + gap(5) + ruleH + gap(7));
+const largeTop = (right) => row(dots('10.06', 26) + gap(10) + tx('TUE', 11, { w: 600 }) + grow + tx(right, 9.5, { c: C.faint }));
+const W = (cls, inner, cap) => `<figure><div class="w ${cls}">${inner}</div><figcaption>${cap}</figcaption></figure>`;
+const section = (name, desc, items) => `<section><div class="sh"><h2>${name}</h2><p>${desc}</p></div><div class="rack">${items.join('')}</div></section>`;
+
+// ---------- COUNTDOWN ----------
+const CD = [['D-79', '冬休み', '12.24', 'THU', true], ['D-111', '期末試験', '01.25', 'MON'], ['D-159', '誕生日', '03.14', 'SUN']];
+const periods = [['YEAR', .764, 'あと 86日'], ['MONTH', .175, 'あと 25日'], ['WEEK', .205, 'あと 5日'], ['TODAY', .438, 'あと 13時間']];
+const cdRow = (r, big) => row(mark(r[4]) + gap(big ? 6 : 5) + `<div style="width:${big ? 46 : 40}px;flex:none">${tx(r[0], big ? 12 : 11.5, { w: 600, c: r[4] ? C.acc : C.ink })}</div>` + gap(big ? 6 : 5)
+  + tx(r[1], big ? 14.5 : 13, { w: 500, sys: 1 }) + grow + tx(r[2] + (big ? ' ' + r[3] : ''), big ? 11.5 : 11, { c: C.dim }));
+const barRow = (p, big) => row(`<div style="width:${big ? 52 : 44}px;flex:none">${tx(p[0], big ? 10.5 : 10, { w: 600, c: C.dim })}</div>` + gap(6)
+  + dotRow(bar(p[1], big ? 20 : 10), big ? 7 : 8) + grow + tx(p[2], big ? 11.5 : 11, { w: 500 }));
+const countdown = [
+  W('s', row(tx('NEXT', 10.5, { w: 600, c: C.acc }) + grow + tx('12.24 THU', 10.5, { c: C.dim })) + gap(6)
+    + row(dots('79', 24) + gap(6) + tx('DAYS', 10.5, { w: 600, c: C.dim })) + gap(5)
+    + tx('冬休み', 14, { w: 600, sys: 1, cls: 'wrap2' }) + grow + ruleH + gap(5)
+    + row(tx('2026', 9, { w: 600, c: C.dim }) + grow + tx('あと 86日', 11, { w: 600 })), '小 · いちばん近い 1 件'),
+  W('m', row(col(tx('2026', 10, { w: 600 }) + gap(4) + dots('86', 24) + gap(4) + tx('DAYS LEFT', 10, { c: C.dim }) + grow
+      + dotRow(bar(.764, 8), 8) + gap(4) + tx('76%', 10, { w: 500, c: C.faint }), 'width:64px;flex:none;align-self:stretch')
+    + gap(10) + ruleV + gap(10)
+    + col(row(tx('COUNTDOWN', 10, { w: 600, c: C.dim }) + grow + tx('3件', 10, { c: C.faint })) + gap(5) + CD.map(r => cdRow(r)).join(gap(5)), 'flex:1'), 'align-items:flex-start;flex:1'), '中 · 今年の残り＋一覧'),
+  W('l', largeTop('UPD 10:30') + gap(10) + head('REMAINING', '') + col(periods.map(p => barRow(p, 1)).join(gap(6))) + gap(10)
+    + head('COUNTDOWN', '3件') + col(CD.map(r => cdRow(r, 1)).join(gap(5))), '大 · 残り時間＋カウントダウン'),
+];
+
+// ---------- TODO ----------
+const TD = [['レポート提出', 'LATE', 'hl'], ['洗濯', 'LATE', 'late'], ['ゼミ資料を印刷', '15:00'], ['メール返信', '18:00'], ['牛乳を買う', '']];
+const tdRow = (r, big, small) => row(ring(small ? 9 : big ? 11 : 10, r[2] === 'hl' ? C.acc : C.dim) + gap(small ? 5 : big ? 7 : 6)
+  + tx(r[0], big ? 14.5 : 13, { w: 500, sys: 1 }) + grow + (small || !r[1] ? '' : tx(r[1], big ? 12 : 11.5, { w: 500, c: r[2] === 'hl' ? C.acc : r[2] === 'late' ? C.ink : C.dim })));
+const todo = [
+  W('s', row(tx('TODO', 10.5, { w: 600 }) + grow + tx('10.06 TUE', 10.5, { c: C.dim })) + gap(6)
+    + row(dots('05', 24) + gap(6) + col(tx('LEFT', 10.5, { w: 600, c: C.dim }) + tx('1/6 DONE', 10.5, { c: C.faint }))) + gap(6)
+    + col(tdRow(TD[0], 0, 1) + gap(4) + tdRow(TD[1], 0, 1) + gap(4) + row(gap(14) + tx('+3件', 10.5, { w: 500, c: C.faint }))), '小 · 残り件数と上から'),
+  W('m', row(col(dots('05', 24) + gap(4) + tx('TODO', 10, { w: 600, c: C.acc }) + gap(1) + tx('LEFT', 10, { c: C.dim }) + grow
+      + tx('DONE', 10, { c: C.dim }) + gap(1) + tx('1/6', 10, { w: 500, c: C.faint }), 'width:40px;flex:none;align-self:stretch')
+    + gap(10) + ruleV + gap(10) + col(TD.map(r => tdRow(r)).join(gap(5)), 'flex:1'), 'align-items:flex-start;flex:1'), '中 · タップでリマインダー'),
+  W('l', largeTop('UPD 10:30') + gap(10) + head('TODAY', '1/6 DONE', '', true) + col(TD.map(r => tdRow(r, 1)).join(gap(5))) + gap(10)
+    + head('TOMORROW', '2件', '10.07 WED') + col(tdRow(['ジム', '19:00'], 1) + gap(5) + tdRow(['家賃', ''], 1)), '大 · 明日の欄はカレンダーの明日へ'),
+];
+
+// ---------- HABIT ----------
+const HB = [['筋トレ', [1, 0, 1, 1, 1, 1, 1], 5, '6/28'], ['読書', [0, 0, 0, 1, 1, 1, 'R'], 3, '3/28'], ['勉強', [0, 1, 0, 0, 1, 0, 'r'], 0, '3/28']];
+const letters = (pitch, size) => row(['W', 'T', 'F', 'S', 'S', 'M', 'T'].map((l, i) => `<div style="width:${pitch}px;text-align:center;flex:none">${tx(l, size, { w: i === 6 ? 600 : 400, c: i === 6 ? C.ink : C.faint })}</div>`).join(''));
+const month = seed => Array.from({ length: 28 }, (_, i) => (i === 27 ? (seed === 'R' ? 'R' : seed === 'r' ? 'r' : 1) : ((i * 7 + seed.length * 3) % 5 < 2 ? 1 : 0)));
+const habit = [
+  W('s', row(tx('筋トレ', 14, { w: 600, sys: 1 }) + grow + tx('10.06', 10.5, { c: C.dim })) + gap(6)
+    + row(dots('5', 24) + gap(6) + col(tx('DAYS', 10.5, { w: 600, c: C.dim }) + tx('STREAK', 10.5, { c: C.dim }))) + gap(8)
+    + dotRow(HB[0][1], 17) + gap(3) + letters(17, 9) + grow + ruleH + gap(5)
+    + row(tx('TODAY', 9, { w: 600, c: C.dim }) + grow + tx('記録済み', 11, { w: 500, sys: 1 })), '小 · 1 つの習慣を大きく'),
+  W('m', row(tx('HABIT', 10, { w: 600 }) + gap(8) + tx('10.06 TUE', 10, { c: C.dim }) + grow + tx('1/3 DONE', 10, { c: C.faint })) + gap(6)
+    + row(grow + letters(13, 9) + gap(48)) + gap(3)
+    + col(HB.map(h => row(tx(h[0], 13, { w: 500, sys: 1 }) + grow + dotRow(h[1], 13) + gap(8)
+      + `<div style="width:40px;text-align:right;flex:none">${tx(h[2] + '日', 11.5, { w: 600, c: h[2] ? C.ink : C.faint })}</div>`)).join(gap(5))), '中 · 行をタップで今日を記録'),
+  W('l', row(dots('10.06', 26) + gap(10) + tx('TUE', 11, { w: 600 }) + grow + tx('1/3 DONE', 10.5, { c: C.faint })) + gap(10)
+    + head('HABIT', 'LAST 28 DAYS') + col(HB.map(h => col(row(tx(h[0], 14.5, { w: 500, sys: 1 }) + grow + tx(h[3], 11.5, { c: C.faint }) + gap(10)
+      + `<div style="width:44px;text-align:right;flex:none">${tx(h[2] + '日', 12, { w: 600, c: h[2] ? C.ink : C.faint })}</div>`) + gap(3)
+      + dotRow(month(h[1].slice(-1)[0] === 1 ? 'x' : h[1].slice(-1)[0]), 10))).join(gap(9))), '大 · 直近 28 日'),
+];
+
+// ---------- CLOCK（今の時刻で動く） ----------
+const ZONES = [['LONDON', 'Europe/London'], ['NEW YORK', 'America/New_York'], ['LOS ANGELES', 'America/Los_Angeles']];
+const live = (tz, size, w, c, align = 'left') => `<span class="tx clk" data-tz="${tz || ''}" style="font:${w} ${size}px var(--mono);color:${c};text-align:${align}">--:--:--</span>`;
+const hourStates = h => Array.from({ length: 24 }, (_, i) => (i < h ? 1 : i === h ? 'a' : 0));
+const H = new Date().getHours();
+const diff = tz => { const now = new Date(); const p = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' }).formatToParts(now).reduce((o, x) => (o[x.type] = +x.value, o), {});
+  const n = Math.round((Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes())) / 9e5) / 4;
+  return (n > 0 ? '+' : n < 0 ? '-' : '±') + Math.abs(n) + 'H'; };
+const today = new Date();
+const md = d => pad2(d.getMonth() + 1) + '.' + pad2(d.getDate());
+const clock = [
+  W('s', row(tx(WEEK[today.getDay()], 10.5, { w: 600 }) + grow + tx(md(today), 10.5, { c: C.dim })) + gap(8)
+    + live(null, 26, 600, C.ink) + gap(2) + row(tx('LONDON', 10.5, { w: 600, c: C.dim }) + gap(6) + live('Europe/London', 10.5, 400, C.dim)) + grow
+    + dotRow(hourStates(H).slice(0, 12), 10) + gap(2) + dotRow(hourStates(H).slice(12), 10), '小 · 時刻と 24 時間'),
+  W('m', row(col(tx('TOKYO', 10, { w: 600 }) + gap(2) + live(null, 30, 600, C.ink) + gap(6) + dotRow(hourStates(H), 6) + grow
+      + row(dots(md(today), 24) + gap(8) + tx(WEEK[today.getDay()], 10, { w: 600, c: C.dim })), 'width:150px;flex:none;align-self:stretch')
+    + gap(12) + ruleV + gap(12)
+    + col(ZONES.slice(0, 2).map(z => col(row(tx(z[0], 10, { w: 600, c: C.dim }) + gap(6) + tx(diff(z[1]), 10, { c: C.faint })) + gap(2) + live(z[1], 15, 600, C.ink))).join(gap(8)) + gap(8)
+      + row(`<div style="width:40px;flex:none">${tx('TODAY', 9, { w: 600, c: C.dim })}</div>` + dotRow(bar((today.getHours() * 60 + today.getMinutes()) / 1440, 10), 6)) + gap(3)
+      + row(`<div style="width:40px;flex:none">${tx('MONTH', 9, { w: 600, c: C.dim })}</div>` + dotRow(bar((today.getDate() - 1) / new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate(), 10), 6)), 'flex:1'),
+    'align-items:flex-start;flex:1'), '中 · 左＝アラーム／右＝世界時計'),
+  W('l', row(dots(md(today), 26) + gap(10) + tx(WEEK[today.getDay()], 11, { w: 600 }) + grow + tx('TOKYO', 10.5, { c: C.faint })) + gap(10)
+    + live(null, 44, 600, C.ink) + gap(12)
+    + head('24H', pad2(H) + ':00–') + dotRow(hourStates(H), 11.5) + gap(3)
+    + row([0, 6, 12, 18].map(h => `<div style="width:69px;flex:none">${tx(h, 9, { c: C.faint })}</div>`).join('')) + gap(12)
+    + head('WORLD', '') + col(ZONES.map(z => row(tx(z[0], 11.5, { w: 600 }) + gap(8) + tx(diff(z[1]), 11, { c: C.faint }) + grow + live(z[1], 16, 600, C.ink, 'right'))).join(gap(6))),
+    '大 · 時刻／24H／世界時計'),
+];
+
+// ---------- LAUNCHER ----------
+const APPS = [['CAL', 'calendar'], ['TODO', 'list-checks'], ['NOTION', 'file-text', 'inv'], ['CLAUDE', 'sparkle', 'acc'], ['STUDY', 'graduation-cap', 'inv'], ['NOTES', 'pen-line'],
+  ['MUSIC', 'music'], ['CLOCK', 'clock'], ['PHOTO', 'image'], ['SET', 'settings'], ['MARU', 'circle-dot'], ['MAPS', 'map'], ['WTHR', 'cloud-sun'], ['MAIL', 'mail'], ['HEALTH', 'heart'], ['STORE', 'shopping-bag']];
+const tile = (a, icon, tileW, label) => `<div class="col" style="width:${tileW}px;flex:none;align-items:center;gap:4px">`
+  + `<div class="tile" style="width:${icon}px;height:${icon}px;border-radius:${Math.round(icon * .28)}px;background:${a[2] === 'inv' ? C.ink : C.ghost};color:${a[2] === 'inv' ? 'var(--card)' : a[2] === 'acc' ? C.acc : C.ink}"><i data-lucide="${a[1]}"></i></div>`
+  + `<span class="lbl" style="font-size:${label}px;color:${a[2] === 'acc' ? C.acc : C.dim}">${a[0]}</span></div>`;
+const grid = (apps, cols, icon, tileW, label, g) => col(Array.from({ length: Math.ceil(apps.length / cols) }, (_, r) =>
+  row(apps.slice(r * cols, r * cols + cols).map(a => tile(a, icon, tileW, label)).join(grow), 'align-items:flex-start')).join(gap(g)));
+const launcher = [
+  W('s', grid(APPS.slice(0, 4), 2, 40, 54, 9.5, 6), '小 · タップで一覧から選ぶ'),
+  W('m', grid(APPS.slice(0, 8), 4, 38, 64, 9.5, 8), '中 · 8 個（タイルごとに別のアプリ）'),
+  W('l', row(dots('10.06', 26) + gap(10) + tx('TUE', 11, { w: 600 }) + grow + tx('APPS 1/2', 10.5, { c: C.faint })) + gap(12)
+    + grid(APPS, 4, 40, 70, 10, 8), '大 · 16 個（2 ページ目に残り 2 個）'),
+];
+
+document.getElementById('app').outerHTML = `<div style="display:flex;flex-direction:column;gap:48px">${[
+  section('COUNTDOWN', '残り時間＋カウントダウン。赤は最も近い 1 件', countdown),
+  section('TODO', 'iOS リマインダーの今日のやること。赤は最も急ぐ 1 件', todo),
+  section('HABIT', '習慣トラッカー。赤い輪は今日まだの習慣（上の 1 つ）', habit),
+  section('CLOCK', '時刻と世界時計は秒まで動く。赤は今の時間の点', clock),
+  section('LAUNCHER', '1 つのウィジェットから複数のアプリ。黒地は Notion と studymgr、赤は Claude だけ', launcher),
+].join('')}</div>`;
+
+// 時計：午前 0 時からの経過（0 時台は 24:）を H:MM:SS で
+function wall(tz) {
+  const n = new Date();
+  if (!tz) return [n.getHours(), n.getMinutes(), n.getSeconds()];
+  const p = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(n).reduce((o, x) => (o[x.type] = +x.value, o), {});
+  return [p.hour % 24, p.minute, p.second];
+}
+function tick() {
+  document.querySelectorAll('.clk').forEach(el => {
+    const [h, m, s] = wall(el.dataset.tz);
+    el.textContent = (h === 0 ? 24 : h) + ':' + pad2(m) + ':' + pad2(s);
+  });
+}
+tick();
+setInterval(tick, 1000);
+try { window.lucide && lucide.createIcons({ attrs: { 'stroke-width': 1.5 } }); } catch (e) {}
+</script>
