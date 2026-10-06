@@ -15,8 +15,11 @@
      ロック画面：対応しません
 
    アプリの組み合わせ（セット）
-     Scriptable で ▶ →「アプリを編集」で、名前付きのセット（例：勉強・生活）を
-     いくつでも作れます。セットごとにアプリの追加・変更・並べ替え・削除ができ、
+     Scriptable で ▶ →「アプリを編集」で編集画面（一覧）が開きます。
+       ・いちばん上の「セット：○○ ▾」… セットの切り替え・作成・名前変更・削除
+       ・アプリの行 … タップで表示名・開く先・アイコン・色を変更、↑↓ で並べ替え、✕ で外す
+       ・「＋ アプリを追加」… 種類ごとの一覧からタップで入れる・外す（✓ が入っている印）
+     名前付きのセット（例：勉強・生活）はいくつでも作れ、
      iCloud（launcher/sets.json）に保存して iPhone と iPad で共有します。
      ウィジェットの Parameter にセット名を入れると、そのセットが出ます。
 
@@ -265,20 +268,36 @@ async function appMenu(setName) {
 // ============================================================
 const DEFAULT_SET = "すべて";
 
-// 追加するときに選べるアプリ（今の 18 個＋よく使うもの）
-const CATALOG = CONFIG.apps.concat([
-  { label: "MSG",    icon: "message",          url: "sms:" },
-  { label: "YT",     icon: "play.rectangle",   url: "youtube://" },
-  { label: "LINE",   icon: "bubble.left",      url: "line://" },
-  { label: "INSTA",  icon: "camera",           url: "instagram://" },
-  { label: "X",      icon: "at",               url: "twitter://" },
-  { label: "SPOT",   icon: "headphones",       url: "spotify://" },
-  { label: "GMAIL",  icon: "tray",             url: "googlegmail://" },
-  { label: "GMAPS",  icon: "map.circle",       url: "comgooglemaps://" },
-  { label: "CHROME", icon: "globe",            url: "googlechrome://" },
-  { label: "SLACK",  icon: "number",           url: "slack://" },
-  { label: "SHORT",  icon: "square.stack.3d.up", url: "shortcuts://" },
-]);
+// 追加するときに選べるアプリ：種類ごとに [表示名, 日本語名] か、新しいアプリの定義
+const BASE = Object.fromEntries(CONFIG.apps.map(a => [a.label, a]));
+const CATALOG_GROUPS = [
+  ["Apple のアプリ", [["CAL", "カレンダー"], ["TODO", "リマインダー"], ["CLOCK", "時計"], ["PHOTO", "写真"], ["MUSIC", "ミュージック"],
+    ["MAPS", "マップ"], ["WTHR", "天気"], ["MAIL", "メール"], ["HEALTH", "ヘルスケア"], ["FILES", "ファイル"], ["TRANS", "翻訳"],
+    ["STORE", "App Store"], ["SET", "設定"],
+    { label: "MSG", icon: "message", url: "sms:", name: "メッセージ" },
+    { label: "SHORT", icon: "square.stack.3d.up", url: "shortcuts://", name: "ショートカット" }]],
+  ["勉強・仕事", [["NOTION", "Notion"], ["CLAUDE", "Claude"], ["STUDY", "STUDYMANAGER"], ["NOTES", "GoodNotes"],
+    { label: "GMAIL", icon: "tray", url: "googlegmail://", name: "Gmail" },
+    { label: "SLACK", icon: "number", url: "slack://", name: "Slack" },
+    { label: "CHROME", icon: "globe", url: "googlechrome://", name: "Chrome" },
+    { label: "GMAPS", icon: "map.circle", url: "comgooglemaps://", name: "Google マップ" }]],
+  ["SNS・連絡", [
+    { label: "LINE", icon: "bubble.left", url: "line://", name: "LINE" },
+    { label: "INSTA", icon: "camera", url: "instagram://", name: "Instagram" },
+    { label: "X", icon: "at", url: "twitter://", name: "X" }]],
+  ["エンタメ", [
+    { label: "YT", icon: "play.rectangle", url: "youtube://", name: "YouTube" },
+    { label: "SPOT", icon: "headphones", url: "spotify://", name: "Spotify" }]],
+  ["その他", [["MARU", "丸ポップ（ショートカット経由）"]]],
+].map(([cat, items]) => [cat, items.map(x => Array.isArray(x) ? Object.assign({}, BASE[x[0]], { name: x[1] }) : x)]);
+const CATALOG = CATALOG_GROUPS.flatMap(g => g[1]);
+
+// アプリの日本語名（一覧にあれば。無ければ開く先）
+function appName(app) {
+  const c = CATALOG.find(x => x.url === app.url);
+  return c ? c.name : app.url;
+}
+
 // アイコンの候補（SF Symbols の名前は自分で入力もできる）
 const ICONS = ["square", "circle", "star", "heart", "book", "pencil", "doc.text", "folder", "calendar", "clock", "music.note",
   "camera", "photo", "map", "cart", "bag", "gamecontroller", "graduationcap", "dumbbell", "fork.knife", "house", "globe", "sparkle"];
@@ -325,34 +344,200 @@ function pickSet(sets, name) {
 }
 
 // ============================================================
-// ▶ →「アプリを編集」
+// ▶ →「アプリを編集」：一覧で見ながら編集する画面（UITable）
 // ============================================================
+const UI = { ink: new Color("#0d0d0d"), dim: new Color("#5c5c59"), faint: new Color("#0d0d0d", 0.45), accent: new Color("#ff3b30"), ground: new Color("#f2f1ee") };
+
 async function editMenu() {
   const sets = await loadSets();
-  const ops = ["セットの中を編集", "セットを作る", "セットの名前を変える", "セットを削除する", "初期に戻す"];
-  const i = await sheet("アプリを編集（セット " + sets.length + " 個）", ops);
-  if (i === 0) {
-    const j = await pickSetIndex(sets, "編集するセット");
-    if (j >= 0) await editSet(sets, j);
-  } else if (i === 1) await createSet(sets);
-  else if (i === 2) await renameSet(sets);
-  else if (i === 3) await deleteSet(sets);
-  else if (i === 4) {
+  const st = { sets, cur: Math.max(0, sets.findIndex(x => x.name === SET_NAME)) };
+  const table = new UITable();
+  table.showSeparators = true;
+  st.redraw = () => drawEditor(table, st);
+  st.redraw();
+  await table.present(true);
+}
+
+function drawEditor(table, st) {
+  table.removeAllRows();
+  const set = st.sets[st.cur];
+
+  // セットの見出し（タップで切り替え・作成・名前変更・削除）
+  const head = new UITableRow();
+  head.height = 64;
+  head.dismissOnSelect = false;
+  head.backgroundColor = UI.ground;
+  const ht = head.addText("セット：" + set.name + "  ▾", "タップでセットの切り替え・作成・名前変更・削除（全 " + st.sets.length + " 個）");
+  ht.titleFont = Font.boldSystemFont(20);
+  ht.subtitleColor = UI.dim;
+  head.onSelect = async () => { await setMenu(st); st.redraw(); };
+  table.addRow(head);
+
+  table.addRow(label("表示中のアプリ（" + set.apps.length + " 個）　行をタップで変更・↑↓ で並べ替え・✕ で外す"));
+  if (!set.apps.length) table.addRow(label("まだアプリがありません。下の「＋ アプリを追加」から選んでください。"));
+  set.apps.forEach((app, i) => {
+    // ページの区切り：中は 8 個、大は 16 個ずつ
+    if (i && i % 8 === 0) table.addRow(label("── ここから 中 " + (i / 8 + 1) + " ページ目" + (i % 16 === 0 ? "・大 " + (i / 16 + 1) + " ページ目" : "") + " ──", true));
+    const row = new UITableRow();
+    row.height = 54;
+    row.dismissOnSelect = false;
+    appCells(row, app, 58);
+    const up = row.addButton("↑");
+    up.widthWeight = 10;
+    up.onTap = () => { move(st, i, -1); };
+    const down = row.addButton("↓");
+    down.widthWeight = 10;
+    down.onTap = () => { move(st, i, 1); };
+    const del = row.addButton("✕");
+    del.widthWeight = 10;
+    del.onTap = () => { set.apps.splice(i, 1); saveSets(st.sets); st.redraw(); };
+    row.onSelect = async () => { if (await changeApp(app)) saveSets(st.sets); st.redraw(); };
+    table.addRow(row);
+  });
+
+  const add = new UITableRow();
+  add.height = 52;
+  add.dismissOnSelect = false;
+  const at = add.addText("＋ アプリを追加", "一覧から選ぶ・自分で入れる");
+  at.titleFont = Font.semiboldSystemFont(17);
+  at.subtitleColor = UI.dim;
+  add.onSelect = async () => { await addScreen(st); st.redraw(); };
+  table.addRow(add);
+  table.reload();
+}
+
+// アイコン・表示名・日本語名（と色の説明）のセル
+function appCells(row, app, textWeight) {
+  const img = row.addImage(symbol(app.icon, 44));
+  img.widthWeight = 12;
+  const note = app.style === "invert" ? "・黒地" : app.style === "accent" ? "・赤" : "";
+  const t = row.addText(app.label, appName(app) + note);
+  t.widthWeight = textWeight;
+  t.titleFont = Font.semiboldMonospacedSystemFont(15);
+  t.titleColor = app.style === "accent" ? UI.accent : UI.ink;
+  t.subtitleColor = UI.dim;
+  return t;
+}
+
+// 説明や区切りの 1 行
+function label(text, small) {
+  const row = new UITableRow();
+  row.height = small ? 30 : 40;
+  row.dismissOnSelect = false;
+  const t = row.addText(text);
+  t.titleFont = small ? Font.mediumMonospacedSystemFont(11) : Font.systemFont(13);
+  t.titleColor = small ? UI.faint : UI.dim;
+  return row;
+}
+
+function move(st, i, d) {
+  const apps = st.sets[st.cur].apps, j = i + d;
+  if (j < 0 || j >= apps.length) return;
+  [apps[i], apps[j]] = [apps[j], apps[i]];
+  saveSets(st.sets);
+  st.redraw();
+}
+
+// 「＋ アプリを追加」：種類ごとの一覧。タップで入れる・外す（✓ が入っている印）
+async function addScreen(st) {
+  const set = st.sets[st.cur];
+  const table = new UITable();
+  table.showSeparators = true;
+  const draw = () => {
+    table.removeAllRows();
+    table.addRow(label("「" + set.name + "」に追加（いま " + set.apps.length + " 個）　タップで入れる・外す。終わったら閉じる"));
+    const own = new UITableRow();
+    own.height = 52;
+    own.dismissOnSelect = false;
+    const ot = own.addText("＋ 自分で入れる", "URL・ショートカットで開くアプリ");
+    ot.titleFont = Font.semiboldSystemFont(17);
+    ot.subtitleColor = UI.dim;
+    own.onSelect = async () => {
+      const app = await customApp();
+      if (app) { set.apps.push(app); saveSets(st.sets); }
+      draw();
+    };
+    table.addRow(own);
+    CATALOG_GROUPS.forEach(([cat, items]) => {
+      const h = new UITableRow();
+      h.isHeader = true;
+      h.height = 36;
+      h.addText(cat).titleColor = UI.dim;
+      table.addRow(h);
+      items.forEach(c => {
+        const row = new UITableRow();
+        row.height = 52;
+        row.dismissOnSelect = false;
+        const has = set.apps.some(a => a.url === c.url);
+        appCells(row, c, 70);
+        const mark = row.addText(has ? "✓" : "");
+        mark.widthWeight = 12;
+        mark.rightAligned();
+        mark.titleColor = UI.accent;
+        mark.titleFont = Font.boldSystemFont(20);
+        row.onSelect = () => {
+          const k = set.apps.findIndex(a => a.url === c.url);
+          if (k >= 0) set.apps.splice(k, 1);
+          else set.apps.push({ label: c.label, icon: c.icon, url: c.url, style: c.style });
+          saveSets(st.sets);
+          draw();
+        };
+        table.addRow(row);
+      });
+    });
+    table.reload();
+  };
+  draw();
+  await table.present(true);
+}
+
+// セットの切り替え・作成・名前変更・削除・初期化
+async function setMenu(st) {
+  const others = st.sets.map((x, i) => i).filter(i => i !== st.cur);
+  const opts = others.map(i => "切り替え：" + st.sets[i].name + "（" + st.sets[i].apps.length + " 個）")
+    .concat(["＋ セットを作る", "このセットの名前を変える", "このセットを削除する", "初期に戻す"]);
+  const k = await sheet("セット（いま：" + st.sets[st.cur].name + "）", opts);
+  if (k < 0) return;
+  if (k < others.length) { st.cur = others[k]; return; }
+  const op = k - others.length;
+  if (op === 0) {
+    const name = await askSetName("セットを作る", "", st.sets);
+    if (!name) return;
+    const c = await sheet("中身", ["空のまま", "「" + st.sets[st.cur].name + "」を複製"]);
+    if (c < 0) return;
+    st.sets.push({ name, apps: c === 0 ? [] : st.sets[st.cur].apps.map(a => Object.assign({}, a)) });
+    st.cur = st.sets.length - 1;
+    saveSets(st.sets);
+    await notice("セットを作りました", "ウィジェットの Parameter に「" + name + "」と入れると表示されます。");
+  } else if (op === 1) {
+    const old = st.sets[st.cur].name;
+    const name = await askSetName("セットの名前を変える", old, st.sets);
+    if (!name || name === old) return;
+    st.sets[st.cur].name = name;
+    saveSets(st.sets);
+    await notice("名前を変えました", "このセットを出しているウィジェットの Parameter も「" + name + "」に直してください。");
+  } else if (op === 2) {
+    if (st.sets.length === 1) return notice("削除できません", "セットが 1 つしかありません。中身を変えるか、「初期に戻す」を使ってください。");
+    const a = new Alert();
+    a.title = "「" + st.sets[st.cur].name + "」を削除しますか？";
+    a.message = "このセットを出しているウィジェットは、最初のセットの表示になります。";
+    a.addDestructiveAction("削除する");
+    a.addCancelAction("キャンセル");
+    if ((await a.presentAlert()) !== 0) return;
+    st.sets.splice(st.cur, 1);
+    st.cur = 0;
+    saveSets(st.sets);
+  } else {
     const a = new Alert();
     a.title = "初期に戻しますか？";
     a.message = "作ったセットはすべて消え、18 個が入った「" + DEFAULT_SET + "」だけになります。";
     a.addDestructiveAction("初期に戻す");
     a.addCancelAction("キャンセル");
-    if ((await a.presentAlert()) === 0) {
-      saveSets(defaultSets());
-      await notice("初期に戻しました", "セット「" + DEFAULT_SET + "」だけになりました。");
-    }
+    if ((await a.presentAlert()) !== 0) return;
+    st.sets.splice(0, st.sets.length, ...defaultSets());
+    st.cur = 0;
+    saveSets(st.sets);
   }
-}
-
-async function pickSetIndex(sets, title) {
-  if (sets.length === 1) return 0;
-  return sheet(title, sets.map(x => x.name + "（" + x.apps.length + " 個）"));
 }
 
 // 名前の入力（カンマは Parameter の区切り、数字・dark・透明 は別の意味があるので使えない）
@@ -382,82 +567,8 @@ async function askSetName(title, text, sets) {
   return name;
 }
 
-async function createSet(sets) {
-  const name = await askSetName("セットを作る", "", sets);
-  if (!name) return;
-  const k = await sheet("中身", ["空のまま"].concat(sets.map(x => "「" + x.name + "」を複製")));
-  if (k < 0) return;
-  const apps = k === 0 ? [] : sets[k - 1].apps.map(a => Object.assign({}, a));
-  sets.push({ name, apps });
-  saveSets(sets);
-  await notice("セットを作りました", "「" + name + "」（" + apps.length + " 個）。ウィジェットの Parameter に「" + name + "」と入れると表示されます。");
-}
-
-async function renameSet(sets) {
-  const j = await pickSetIndex(sets, "名前を変えるセット");
-  if (j < 0) return;
-  const old = sets[j].name;
-  const name = await askSetName("セットの名前を変える", old, sets);
-  if (!name || name === old) return;
-  sets[j].name = name;
-  saveSets(sets);
-  await notice("名前を変えました", "「" + old + "」→「" + name + "」。このセットを出しているウィジェットの Parameter も「" + name + "」に直してください。");
-}
-
-async function deleteSet(sets) {
-  if (sets.length === 1) return notice("削除できません", "セットが 1 つしかありません。中身を変えるか、「初期に戻す」を使ってください。");
-  const j = await pickSetIndex(sets, "削除するセット");
-  if (j < 0) return;
-  const a = new Alert();
-  a.title = "「" + sets[j].name + "」を削除しますか？";
-  a.message = "このセットを出しているウィジェットは、最初のセットの表示になります。";
-  a.addDestructiveAction("削除する");
-  a.addCancelAction("キャンセル");
-  if ((await a.presentAlert()) !== 0) return;
-  const name = sets[j].name;
-  sets.splice(j, 1);
-  saveSets(sets);
-  await notice("削除しました", "セット「" + name + "」を削除しました。");
-}
-
-// セットの中のアプリ：追加・変更・並べ替え・削除
-async function editSet(sets, j) {
-  const set = sets[j];
-  const i = await sheet("「" + set.name + "」（" + set.apps.length + " 個）", ["アプリを追加", "アプリを変更", "並べ替える", "削除する"]);
-  if (i < 0) return;
-  if (i === 0) {
-    const app = await newApp();
-    if (!app) return;
-    set.apps.push(app);
-    saveSets(sets);
-    return notice("追加しました", "「" + app.label + "」を「" + set.name + "」のいちばん後ろに追加しました。");
-  }
-  if (!set.apps.length) return notice("アプリがありません", "先に「アプリを追加」してください。");
-  const k = await sheet(["", "変更するアプリ", "動かすアプリ", "削除するアプリ"][i], set.apps.map((a, n) => (n + 1) + ". " + a.label));
-  if (k < 0) return;
-  if (i === 1) {
-    if (await changeApp(set.apps[k])) saveSets(sets);
-  } else if (i === 2) {
-    const m = await sheet("「" + set.apps[k].label + "」を動かす", ["いちばん前へ", "1 つ前へ", "1 つ後ろへ", "いちばん後ろへ"]);
-    if (m < 0) return;
-    const [app] = set.apps.splice(k, 1);
-    const to = [0, Math.max(0, k - 1), Math.min(set.apps.length, k + 1), set.apps.length][m];
-    set.apps.splice(to, 0, app);
-    saveSets(sets);
-    await notice("並べ替えました", set.apps.map((a, n) => (n + 1) + ". " + a.label).join("\n"));
-  } else {
-    const label = set.apps[k].label;
-    set.apps.splice(k, 1);
-    saveSets(sets);
-    await notice("削除しました", "「" + label + "」を「" + set.name + "」から外しました。");
-  }
-}
-
-// 追加：一覧から選ぶか、自分で入れる
-async function newApp() {
-  const k = await sheet("追加するアプリ", ["自分で入れる（URL・ショートカット）"].concat(CATALOG.map(a => a.label + "　" + a.url)));
-  if (k < 0) return null;
-  if (k > 0) return Object.assign({}, CATALOG[k - 1]);
+// 一覧に無いアプリ：URL かショートカット名 → 表示名 → アイコン → 色
+async function customApp() {
   const app = { label: "APP", icon: "square", url: "" };
   const how = await sheet("開く先", ["URL を入力する", "ショートカットを開く（名前を入力）"]);
   if (how < 0) return null;

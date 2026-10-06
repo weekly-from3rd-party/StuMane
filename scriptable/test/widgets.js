@@ -246,39 +246,48 @@ const CASES = {
   check('HOURGLASS「だけ」：左と右は 180 度反対向き', ctr(only, (x, y) => [150 - x, 62 - y]) === ctr(onlyR, (x, y) => [x, y]));
   check('HOURGLASS 回した表示は枠の中に収まる', [only, onlyR].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)) && [tl, tr].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)));
 
-  // ---------- LAUNCHER のセット（▶ メニュー：0 アプリを開く / 1 アプリを編集 / 2 小 …）----------
+  // ---------- LAUNCHER の編集画面（▶ メニュー：0 アプリを開く / 1 アプリを編集 / 2 小 …）----------
   const L = 'launcher-widget.js';
   const lUrls = async (param, fam = 'medium') => urls((await run({ file: L, family: fam, now: T(1, 10), param })).w);
-  const ed = (sheets, texts, alerts) => run({ file: L, app: true, now: T(1, 10), sheets, texts, alerts });
+  // ui：開いた一覧画面ごとの操作。tap(table, 文字) で行を選ぶ、btn(table, 文字, ボタン) で行のボタンを押す
+  const tap = (tb, text) => { const r = tb.find(text); return r.onSelect(tb.rows.indexOf(r)); };
+  const btn = (tb, text, b) => tb.find(text).cells.find(c => c.type === 'button' && c.title === b).onTap();
+  const edit = (ui, opt = {}) => run({ file: L, app: true, now: T(1, 10), sheets: [1].concat(opt.sheets || []), texts: opt.texts, alerts: opt.alerts, ui });
   reset();
-  await ed([1, 1, 0], ['勉強']);
-  check('LAUNCHER セットを作る（空）→ Parameter「勉強」は空、指定なしは「すべて」18 個', (await lUrls('勉強')).length === 0 && (await lUrls('', 'extraLarge')).length === 18);
-  await ed([1, 0, 1, 0, 3]);
-  await ed([1, 0, 1, 0, 0, 0, 4, 1], ['youtube://', 'yt']);
+  let seen = [];
+  await edit([async tb => { seen = tb.lines(); }]);
+  check('LAUNCHER 編集画面：セット名・アプリの行（アイコン・表示名・日本語名）・ページの区切り・追加',
+    seen[0].startsWith('セット：すべて') && seen.some(l => l === 'NOTION') && seen.filter(l => l.startsWith('── ここから')).length === 2 && seen[seen.length - 1] === '＋ アプリを追加', seen.slice(0, 4).join(' / '));
+  // セットを作る（空）→ 追加画面で 2 つ入れて 1 つ外す
+  await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, 'NOTION'); await tap(tb, 'YT'); await tap(tb, 'LINE'); await tap(tb, 'LINE'); seen = tb.lines(); }],
+    { sheets: [0, 0], texts: ['勉強'] });
+  check('LAUNCHER セットを作る → 追加画面でタップして入れる・外す（✓）', (await lUrls('勉強')).join(' ') === 'notion:// youtube://' && seen.some(l => l.includes('YT') && l.endsWith('✓')) && seen.some(l => l.startsWith('LINE') && !l.endsWith('✓')),
+    (await lUrls('勉強')).join(' '));
+  check('LAUNCHER 追加画面は種類ごと（Apple のアプリ／勉強・仕事／SNS・連絡／エンタメ／その他）', ['Apple のアプリ', '勉強・仕事', 'SNS・連絡', 'エンタメ', 'その他'].every(c => seen.includes(c)));
+  // ↑ で並べ替え、✕ で外す、行のタップで表示名を変える
+  await edit([async tb => { await tap(tb, 'セット：すべて'); btn(tb, 'YT', '↑'); }], { sheets: [0] });
+  check('LAUNCHER ↑ で並べ替え', (await lUrls('勉強')).join(' ') === 'youtube:// notion://');
+  await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, 'YT'); }], { sheets: [0, 0], texts: ['tube'] });
+  check('LAUNCHER 行をタップして表示名を変える（大文字に）', dump((await run({ file: L, family: 'medium', now: T(1, 10), param: '勉強' })).w).includes('"TUBE"'));
+  await edit([async tb => { await tap(tb, 'セット：すべて'); btn(tb, 'TUBE', '✕'); }], { sheets: [0] });
+  check('LAUNCHER ✕ で外す', (await lUrls('勉強')).join(' ') === 'notion://');
+  // 自分で入れる（URL）
+  await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, '＋ アプリを追加'); }, async tb => { await tap(tb, '＋ 自分で入れる'); }],
+    { sheets: [0, 0, 4, 1], texts: ['myapp://', 'my'] });
   r = await run({ file: L, family: 'medium', now: T(1, 10), param: '勉強' });
-  t = dump(r.w);
-  check('LAUNCHER セットに一覧から追加・自分で追加（URL・表示名・アイコン・色）', urls(r.w).join(' ') === 'notion:// youtube://' && t.includes('"YT"') && t.includes('[SF star 19 #ffffff'), urls(r.w).join(' '));
-  await ed([1, 0, 1, 2, 1, 0]);
-  check('LAUNCHER セットの中を並べ替え（YT をいちばん前へ）', (await lUrls('勉強')).join(' ') === 'youtube:// notion://');
-  await ed([1, 2, 1], ['学校']);
-  check('LAUNCHER セットの名前を変える（勉強→学校。古い名前は最初のセットになる）', (await lUrls('学校')).length === 2 && (await lUrls('勉強')).length === 8);
-  r = await run({ file: L, family: 'small', now: T(1, 10), param: '学校', scriptName: 'L' });
-  check('LAUNCHER 小：タップ先にセット名', r.w.url === 'scriptable:///run?scriptName=L&launch=menu&set=' + encodeURIComponent('学校'), r.w.url);
-  r = await run({ file: L, app: true, now: T(1, 10), query: { launch: 'menu', set: '学校' }, sheets: [1] });
-  check('LAUNCHER 小のタップ → そのセットの一覧から開く', r.log.some(l => l.includes('アプリを開く（学校）')) && r.log.includes('open notion://'), r.log.join(' | '));
-  await ed([1, 0, 1, 3, 0]);
-  check('LAUNCHER セットからアプリを削除', (await lUrls('学校')).join(' ') === 'notion://');
-  r = await ed([1, 1], ['2']);
+  check('LAUNCHER 自分で入れる（URL・表示名・アイコン・色）', urls(r.w).join(' ') === 'notion:// myapp://' && dump(r.w).includes('[SF star 19 #ffffff'), urls(r.w).join(' '));
+  // 名前変更・使えない名前・削除・初期化
+  await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, 'セット：勉強'); }], { sheets: [0, 2], texts: ['学校'] });
+  check('LAUNCHER セットの名前を変える（古い名前は最初のセットになる）', (await lUrls('学校')).length === 2 && (await lUrls('勉強')).length === 8);
+  r = await edit([async tb => { await tap(tb, 'セット：すべて'); }], { sheets: [1], texts: ['2'] });
   check('LAUNCHER 数字・dark・透明 はセット名に使えない', r.log.some(l => l.includes('使えない名前です')));
-  r = await ed([1, 1, 0], ['すべて']);
-  check('LAUNCHER 同じ名前のセットは作らない', r.log.some(l => l.includes('同じ名前があります')));
-  await ed([1, 1, 1], ['生活']);
-  check('LAUNCHER 今のセットを複製して作る', (await lUrls('生活', 'extraLarge')).length === 18);
-  await ed([1, 3, 1], [], [0, 0]);
-  check('LAUNCHER セットを削除（学校 → 最初のセットに戻る）', (await lUrls('学校')).length === 8 && (await lUrls('生活', 'extraLarge')).length === 18);
-  await ed([1, 4], [], [0, 0]);
-  check('LAUNCHER 初期に戻す', (await lUrls('生活', 'extraLarge')).length === 18 && (await lUrls('', 'extraLarge')).length === 18
-    && JSON.parse(FILES.get('/icloud/launcher/sets.json')).length === 1);
+  await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, 'セット：学校'); }], { sheets: [0, 3], alerts: [0] });
+  check('LAUNCHER セットを削除', (await lUrls('学校')).length === 8 && JSON.parse(FILES.get('/icloud/launcher/sets.json')).length === 1);
+  await edit([async tb => { btn(tb, 'CAL', '✕'); await tap(tb, 'セット：すべて'); }], { sheets: [3], alerts: [0] });
+  check('LAUNCHER 初期に戻す', (await lUrls('', 'extraLarge')).length === 18);
+  await edit([async tb => { await tap(tb, 'セット：すべて'); }], { sheets: [0, 1], texts: ['朝'] });
+  r = await run({ file: L, family: 'small', now: T(1, 10), param: '朝', scriptName: 'L' });
+  check('LAUNCHER 小：タップ先にセット名（複製したセット「朝」）', r.w.url === 'scriptable:///run?scriptName=L&launch=menu&set=' + encodeURIComponent('朝'), r.w.url);
   reset();
 
   // ---------- タップ領域の分割 ----------

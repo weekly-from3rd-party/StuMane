@@ -43,6 +43,20 @@ class WidgetStack {
   addStack() { const s = new WidgetStack(); this.children.push(s); return s; }
   addSpacer(n) { if (n !== undefined && !num(n)) throw new TypeError('spacer'); const s = { kind: 'spacer', length: n }; this.children.push(s); return s; }
 }
+// 一覧画面（UITable）。present() のたびに o.ui の操作を 1 つずつ実行する
+class UITableCell {
+  constructor(type, title, subtitle) { if (title !== undefined && typeof title !== 'string') throw new TypeError('cell title'); Object.assign(this, { type, title, subtitle, widthWeight: 1 }); }
+  static text(t, s) { return new UITableCell('text', t, s); } static button(t) { return new UITableCell('button', t); }
+  static image(i) { if (!i || !i.__img) throw new TypeError('cell image'); const c = new UITableCell('image'); c.image = i; return c; }
+  leftAligned() {} centerAligned() {} rightAligned() {}
+}
+class UITableRow {
+  constructor() { this.cells = []; this.height = 44; this.isHeader = false; this.dismissOnSelect = true; }
+  addCell(c) { if (!(c instanceof UITableCell)) throw new TypeError('addCell'); this.cells.push(c); return c; }
+  addText(t, s) { return this.addCell(UITableCell.text(t, s)); } addButton(t) { return this.addCell(UITableCell.button(t)); }
+  addImage(i) { return this.addCell(UITableCell.image(i)); }
+  get texts() { return this.cells.filter(c => c.type === 'text').map(c => c.title).join(' '); }
+}
 const FILES = new Map(), DIRS = new Set();
 const fmOf = root => ({ documentsDirectory: () => root, joinPath: (a, b) => a.replace(/\/$/, '') + '/' + b,
   fileExists: p => FILES.has(p) || DIRS.has(p), createDirectory: (p, i) => { if (i !== true) throw new TypeError('mkdir'); DIRS.add(p); },
@@ -102,7 +116,12 @@ async function run(o) {
   class ListWidget extends WidgetStack { constructor() { super(); this.kind = 'widget'; this.dir = 'v'; made = this; }
     presentSmall() { log.push('presentSmall'); return Promise.resolve(); } presentMedium() { log.push('presentMedium'); return Promise.resolve(); }
     presentLarge() { log.push('presentLarge'); return Promise.resolve(); } presentExtraLarge() { log.push('presentExtraLarge'); return Promise.resolve(); } presentAccessoryRectangular() { log.push('presentRect'); return Promise.resolve(); } }
-  const texts = (o.texts || []).slice();
+  const texts = (o.texts || []).slice(), ui = (o.ui || []).slice();
+  class UITable { constructor() { this.rows = []; this.showSeparators = false; }
+    addRow(r) { if (!(r instanceof UITableRow)) throw new TypeError('addRow'); this.rows.push(r); } removeAllRows() { this.rows = []; } reload() {}
+    // テストから：表示中の行の文字（行ごと）、文字で行を探す
+    lines() { return this.rows.map(r => r.texts); } find(text) { const r = this.rows.find(x => x.cells.some(c => c.title === text || c.subtitle === text)) || this.rows.find(x => x.texts.startsWith(text)); if (!r) throw new Error('row not found: ' + text); return r; }
+    async present() { log.push('table「' + (this.rows[0] ? this.rows[0].texts : '') + '」'); const f = ui.shift(); if (f) await f(this); } }
   class Alert { constructor() { this.actions = []; this.fields = []; }
     addTextField(ph, t) { if (ph !== undefined && typeof ph !== 'string') throw new TypeError('addTextField'); this.fields.push(t === undefined ? '' : String(t)); return {}; }
     textFieldValue(i) { if (!Number.isInteger(i) || i >= this.fields.length) throw new TypeError('textFieldValue'); return texts.length ? texts.shift() : this.fields[i]; } addAction(a) { if (typeof a !== 'string') throw new TypeError('addAction'); this.actions.push(a); } addDestructiveAction(a) { this.addAction(a); } addCancelAction() {}
@@ -119,6 +138,7 @@ async function run(o) {
   const Calendar = { forRemindersByTitle: async t => { if (rems().some(r => r.calendar.title === t)) return { title: t }; throw new Error('no list ' + t); } };
   const scr = o.pad ? [834, 1194] : (o.screen || [393, 852]);
   const ctx = vm.createContext({ Date: FDate, Color, Size, Rect, Point, Font, DrawContext, ListWidget, Alert, FileManager, Data, WebView, console, Reminder, Calendar, SFSymbol,
+    UITable, UITableRow, UITableCell,
     Safari: { open: u => { if (!okUrl(u)) throw new TypeError('Safari.open ' + u); log.push('open ' + u); } },
     URLScheme: { forRunningScript: () => 'scriptable:///run?scriptName=' + encodeURIComponent(o.scriptName || 'Widget') },
     Photos: { fromLibrary: () => photos.length ? Promise.resolve(photos.shift()) : Promise.reject(new Error('cancel')) },
