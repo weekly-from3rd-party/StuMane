@@ -64,10 +64,10 @@ const WEEK = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 // 予定 1 件＝2 行：「● 開始  予定名」／「  終了  場所」
 const ROWSTYLE = {
-  medium: { mark: 6, gap: 5, timeW: 37, startSize: 11.5, endSize: 11,   titleSize: 13,   locSize: 11,   lineGap: 1, tag: false },
-  large:  { mark: 6, gap: 6, timeW: 42, startSize: 12,   endSize: 11.5, titleSize: 14.5, locSize: 11.5, lineGap: 1, tag: true  },
+  medium: { mark: 6, gap: 5, timeW: 37, startSize: 11.5, endSize: 11,   titleSize: 13,   locSize: 11,   lineGap: 1, tag: false, rowGap: 2 },
+  large:  { mark: 6, gap: 6, timeW: 42, startSize: 12,   endSize: 11.5, titleSize: 14.5, locSize: 11.5, lineGap: 1, tag: true,  rowGap: 5 },
 };
-const GAP = 5;        // 予定と予定の間
+// 予定と予定の間は ROWSTYLE の rowGap（中 2・大 5。中は 4 件入れるため詰めた 2026-10-07）
 const NOTE_H = 16;    // 「予定なし」「+N件」などの 1 行
 const SEP_H = 14;     // 中サイズの「TOMORROW」区切り行
 const SEC_H = 27;     // 大サイズの見出し（ラベル＋罫線）
@@ -81,6 +81,14 @@ const ROOMY = (() => {
     return false;
   }
 })();
+
+function isPad() {
+  try {
+    return Device.isPad();
+  } catch (e) {
+    return false;
+  }
+}
 
 // 5×7 ドットマトリクス（数字と記号）
 const GLYPHS = {
@@ -140,9 +148,9 @@ async function makeWidget(family) {
 
 // ---------- 中：左に日付、右に予定。余白があれば明日も ----------
 function buildMedium(w, D) {
-  w.setPadding(12, 13, 11, 13);
+  w.setPadding(8, 13, 7, 13);           // 2 行の予定を 4 件入れるため上下を詰めた（2026-10-07 ユーザー承認）
   const s = ROWSTYLE.medium;
-  const budget = ROOMY ? 130 : 122;
+  const budget = ROOMY || isPad() ? 137 : 122;   // 4 件＝32.7×4＋2×3。SE 級は 3 件まで
   const live = D.today.events.filter(e => !e.past);
   const t = fitRows(live, budget, s);
 
@@ -169,7 +177,7 @@ function buildMedium(w, D) {
 
   // 右：今日の予定 → 余った高さに明日
   const col = vstack(main);
-  col.spacing = GAP;
+  col.spacing = s.rowGap;
   col.url = calshow(D.now);
   let used = NOTE_H;
   if (live.length) {
@@ -178,7 +186,7 @@ function buildMedium(w, D) {
   } else {
     addNote(col, todayEmptyText(D.today), 0, sys(12), P.dim);
   }
-  const rest = budget - used - GAP;
+  const rest = budget - used - s.rowGap;
   if (!t.more && rest >= SEP_H) {
     const tm = D.tomorrow;
     const url = calshow(tm.start);
@@ -190,7 +198,7 @@ function buildMedium(w, D) {
     addText(sep, md(tm.start) + " " + WEEK[tm.start.getDay()], mono(10), P.dim);
     sep.addSpacer();
     addText(sep, tm.events.length ? tm.events.length + "件" : "予定なし", mono(10), P.faint);
-    fitRows(tm.events, rest - SEP_H - GAP, s).shown.forEach(e => addEventRow(col, e, s, url));
+    fitRows(tm.events, rest - SEP_H - s.rowGap, s).shown.forEach(e => addEventRow(col, e, s, url));
   }
 }
 
@@ -450,14 +458,14 @@ function rowHeight(e, s) {
 }
 
 function rowsHeight(list, s) {
-  return list.reduce((h, e, i) => h + (i ? GAP : 0) + rowHeight(e, s), 0);
+  return list.reduce((h, e, i) => h + (i ? s.rowGap : 0) + rowHeight(e, s), 0);
 }
 
 // 上から順に、高さの予算に収まる件数だけ取る
 function fitRows(list, budget, s) {
   let h = 0, k = 0;
   for (const e of list) {
-    const add = (k ? GAP : 0) + rowHeight(e, s);
+    const add = (k ? s.rowGap : 0) + rowHeight(e, s);
     if (h + add > budget) break;
     h += add;
     k++;
@@ -472,7 +480,7 @@ function fitSection(list, budget, s, head) {
   for (let k = list.length; k >= 0; k--) {
     const shown = list.slice(0, k), more = list.length - k;
     let h = top + rowsHeight(shown, s);
-    if (k && more) h += GAP + NOTE_H;
+    if (k && more) h += s.rowGap + NOTE_H;
     if (h <= budget) return { shown, more, height: h };
   }
   return null;
@@ -480,7 +488,7 @@ function fitSection(list, budget, s, head) {
 
 function renderList(parent, day, fit, s) {
   const box = vstack(parent);
-  box.spacing = GAP;
+  box.spacing = s.rowGap;
   const indent = s.mark + s.gap;
   if (!fit.shown.length && !fit.more) {
     addNote(box, day.isToday ? todayEmptyText(day) : "予定なし", indent, sys(12), P.dim);
