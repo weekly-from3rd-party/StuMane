@@ -250,6 +250,13 @@ const CASES = {
   check('HOURGLASS「だけ」：左と右は 180 度反対向き', ctr(only, (x, y) => [150 - x, 62 - y]) === ctr(onlyR, (x, y) => [x, y]));
   check('HOURGLASS 回した表示は枠の中に収まる', [only, onlyR].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)) && [tl, tr].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)));
 
+  // Parameter「閉じる」：タイルはこのスクリプト経由（launch=open）→ アプリを開いてから Scriptable を裏に回す
+  r = await run({ file: 'launcher-widget.js', family: 'medium', now: T(1, 10), param: '閉じる', scriptName: 'L' });
+  check('LAUNCHER 閉じる：タイルはスクリプト経由（セット名に取らない）', urls(r.w)[2] === 'scriptable:///run?scriptName=L&launch=open&u=' + encodeURIComponent('notion://') && urls(r.w).length === 8, urls(r.w)[2]);
+  r = await run({ file: 'launcher-widget.js', family: 'small', now: T(1, 10), param: '閉じる,4', scriptName: 'L' });
+  check('LAUNCHER 閉じる：小も同じ', r.w.url === 'scriptable:///run?scriptName=L&launch=open&u=' + encodeURIComponent('claude://'), r.w.url);
+  r = await run({ file: 'launcher-widget.js', app: true, now: T(1, 10), query: { launch: 'open', u: 'notion://' } });
+  check('LAUNCHER 閉じる：開いてから Scriptable を裏に回す', r.log.join('|') === 'open notion://|app close|complete', r.log.join(' | '));
   // ---------- LAUNCHER の編集画面（▶ メニュー：0 アプリを開く / 1 アプリを編集 / 2 小 …）----------
   const L = 'launcher-widget.js';
   const lUrls = async (param, fam = 'medium') => urls((await run({ file: L, family: fam, now: T(1, 10), param })).w);

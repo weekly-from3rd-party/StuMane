@@ -142,6 +142,7 @@ async function run(o) {
   const scr = o.pad ? [834, 1194] : (o.screen || [393, 852]);
   const ctx = vm.createContext({ Date: FDate, Color, Size, Rect, Point, Font, DrawContext, ListWidget, Alert, FileManager, Data, WebView: WV, Image: { fromData: d => { if (!d || !d.__b64) throw new TypeError('Image.fromData'); return { __img: true, size: new Size(180, 180), name: 'b64' }; } }, console, Reminder, Calendar, SFSymbol,
     UITable, UITableRow, UITableCell,
+    App: { close() { log.push('app close'); } },
     Safari: { open: u => { if (!okUrl(u)) throw new TypeError('Safari.open ' + u); log.push('open ' + u); } },
     URLScheme: { forRunningScript: () => 'scriptable:///run?scriptName=' + encodeURIComponent(o.scriptName || 'Widget') },
     Photos: { fromLibrary: () => photos.length ? Promise.resolve(photos.shift()) : Promise.reject(new Error('cancel')) },

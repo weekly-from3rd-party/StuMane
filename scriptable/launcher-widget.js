@@ -78,7 +78,9 @@ const THEME = PARAMS.map(p => p.toLowerCase()).find(p => p === "dark" || p === "
 const CLEAR = PARAMS.some(p => /^(透明|clear)$/i.test(p));
 const PAGE = Math.max(1, parseInt(PARAMS.find(p => /^\d+$/.test(p)) || "1", 10));
 // 数字・dark・透明 以外はセット名
-const SET_NAME = PARAMS.find(p => !/^\d+$/.test(p) && !/^(dark|light|透明|clear)$/i.test(p)) || "";
+// Parameter「閉じる」：タップしたら Scriptable がアプリを開き、そのあと Scriptable を裏に回す（iPad のウインドウ表示で後ろに残るのを避ける試み・2026-10-07）
+const CLOSE_AFTER = PARAMS.some(p => /^(閉じる|close)$/i.test(p));
+const SET_NAME = PARAMS.find(p => !/^\d+$/.test(p) && !/^(dark|light|透明|clear|閉じる|close)$/i.test(p)) || "";
 
 // ---------- 色（Nothing デザインテンプレ：白基調） ----------
 const PALETTES = {
@@ -172,7 +174,7 @@ async function small(w, set, now) {
     return w;
   }
   await loadIcons([app]);
-  w.url = appUrl(app, now);
+  w.url = tapUrl(app, now);
   w.addSpacer();
   addTile(w, app, { icon: 76, tileW: 120, label: 12 }, now, false);
   w.addSpacer();
@@ -214,7 +216,7 @@ function grid(parent, apps, g, now, tap) {
 function addTile(parent, app, g, now, tap) {
   const t = vstack(parent);
   t.size = new Size(g.tileW, 0);
-  if (tap) t.url = appUrl(app, now);
+  if (tap) t.url = tapUrl(app, now);
   const top = hstack(t);
   top.addSpacer();
   const tile = hstack(top);
@@ -264,6 +266,25 @@ function symbol(name, size) {
   const dc = new DrawContext();
   dc.size = new Size(1, 1);
   return dc.getImage();
+}
+
+// タップ先：ふつうはアプリの URL。Parameter「閉じる」なら、このスクリプト経由で開いて Scriptable を裏に回す
+function tapUrl(app, now) {
+  const u = appUrl(app, now);
+  if (!CLOSE_AFTER) return u;
+  const base = URLScheme.forRunningScript();
+  return base + (base.indexOf("?") >= 0 ? "&" : "?") + "launch=open&u=" + encodeURIComponent(u);
+}
+
+// アプリを開いてから Scriptable を裏に回す（App.close があれば。無ければ何もしない）
+async function openAndClose(url) {
+  if (!url) return;
+  Safari.open(url);
+  try {
+    if (typeof App !== "undefined" && App && typeof App.close === "function") App.close();
+  } catch (e) {
+    // 閉じられなくても、アプリは開いている
+  }
 }
 
 function appUrl(app, now) {
@@ -1578,8 +1599,10 @@ async function preview(w, family) {
 // 小サイズのタップ（URL に launch=menu&set=セット名）なら一覧を出す
 const QUERY = args.queryParameters || {};
 const MENU = QUERY.launch === "menu";
-const family = MENU ? "menu" : config.widgetFamily || (config.runsInApp ? await chooseAction() : "medium");
-if (family === "menu") {
+const family = MENU ? "menu" : QUERY.launch === "open" ? "open" : config.widgetFamily || (config.runsInApp ? await chooseAction() : "medium");
+if (family === "open") {
+  await openAndClose(QUERY.u);
+} else if (family === "menu") {
   await appMenu(MENU ? QUERY.set || "" : await previewSetName());
 } else if (family === "edit") {
   await editMenu();
