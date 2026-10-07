@@ -364,6 +364,14 @@ const CASES = {
   await edit([async tb => { await tap(tb, '＋ アプリを追加'); }]);
   check('LAUNCHER 保存済みの選択肢も置き換え、二重にならない', cat().flatMap(g => g.items).filter(x => x.url === newSafari).length === 1 && !JSON.stringify(cat()).includes(oldSafari)
     && (inCat('abceed://') || {}).cat === '勉強・仕事' && !inCat('shortcuts://run-shortcut?name=' + encodeURIComponent('アプリを開く 2')));
+  // setlog：スクリプトに入れた白黒の画像を初期のアイコンに。保存済みのセットにも入れ、線画に戻したら入れ直さない
+  const SETLOG = 'shortcuts://run-shortcut?name=' + encodeURIComponent('アプリを開く 23');
+  FILES.set('/icloud/launcher/sets.json', JSON.stringify([{ name: '朝', apps: [{ label: 'SETLOG', icon: 'list.bullet', url: SETLOG }, { label: 'NOTION', icon: 'doc.text', url: 'notion://' }] }]));
+  r = await run({ file: L, family: 'medium', now: T(1, 10), param: '朝' });
+  check('LAUNCHER setlog は白黒の画像アイコン（保存済みのセットにも入れる）', tiles(r.w).filter(i => !i.symbol).length === 1 && JSON.parse(FILES.get('/icloud/launcher/sets.json'))[0].apps[0].image === 'builtin:setlog', dump(r.w).split('\n').filter(l => l.includes('[')).slice(0, 2).join(' / '));
+  await edit([async tb => { await tap(tb, 'SETLOG'); }], { sheets: [2, 5] });
+  r = await run({ file: L, family: 'medium', now: T(1, 10), param: '朝' });
+  check('LAUNCHER setlog を線画に戻したら、画像を入れ直さない', tiles(r.w).every(i => i.symbol) && !JSON.parse(FILES.get('/icloud/launcher/sets.json'))[0].apps[0].image);
   reset();
 
   // ---------- タップ領域の分割 ----------

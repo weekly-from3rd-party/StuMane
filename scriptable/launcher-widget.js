@@ -380,7 +380,7 @@ const DEFAULT_GROUPS = [
     u("X", "at", "twitter://", "X"),
     u("DISCRD", "person.3", "discord://", "Discord"),
     u("TWITCH", "tv", "twitch://", "Twitch"),
-    sc("SETLOG", "list.bullet", "setlog", "アプリを開く 23")]],
+    Object.assign(sc("SETLOG", "list.bullet", "setlog", "アプリを開く 23"), { image: "builtin:setlog" })]],
   ["エンタメ", [
     u("YT", "play.rectangle", "youtube://", "YouTube"),
     u("SPOT", "headphones", "spotify://", "Spotify"),
@@ -445,7 +445,7 @@ async function loadSets() {
     const sets = JSON.parse(fm.readString(p));
     if (!Array.isArray(sets) || !sets.length) return defaultSets();
     const ok = sets.filter(x => x && x.name && Array.isArray(x.apps));
-    if (ok.map(x => renameUrls(x.apps)).some(Boolean)) saveSets(ok);
+    if (ok.map(x => renameUrls(x.apps) | applyDefaultImages(x.apps)).some(Boolean)) saveSets(ok);
     return ok;
   } catch (e) {
     return defaultSets();
@@ -454,6 +454,20 @@ async function loadSets() {
 
 // 自分で選んだ画像（iCloud の launcher/icons/）。ファイル名 → Image
 const ICON_CACHE = {};
+// スクリプトに入れてある画像（"builtin:名前"）。setlog は元のアイコンを白黒にしたもの（2026-10-07 ユーザー依頼・design/icon-setlog.png の 180px 版）
+const BUILTIN_ICONS = {
+  "builtin:setlog": "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",
+};
+// 初期の画像：この開く先のアプリに、まだ画像が無ければ入れる（自分で線画に戻したもの＝noBuiltin は除く）
+const DEFAULT_IMAGES = { [shortcutUrl("アプリを開く 23")]: "builtin:setlog" };
+function applyDefaultImages(apps) {
+  let changed = false;
+  apps.forEach(a => {
+    const img = DEFAULT_IMAGES[a.url];
+    if (img && !a.image && !a.noBuiltin) { a.image = img; changed = true; }
+  });
+  return changed;
+}
 
 function iconPath(fm, name) {
   return fm.joinPath(fm.joinPath(fm.joinPath(fm.documentsDirectory(), DIR), "icons"), name);
@@ -463,6 +477,14 @@ async function loadIcons(apps) {
   const fm = store();
   for (const a of apps) {
     if (!a.image || ICON_CACHE[a.image]) continue;
+    if (BUILTIN_ICONS[a.image]) {
+      try {
+        ICON_CACHE[a.image] = Image.fromData(Data.fromBase64String(BUILTIN_ICONS[a.image]));
+      } catch (e) {
+        // 読めなければ SF Symbols のアイコンで表示する
+      }
+      continue;
+    }
     const p = iconPath(fm, a.image);
     if (!fm.fileExists(p)) continue;
     try {
@@ -526,7 +548,7 @@ async function loadCatalog(sets) {
       if (Array.isArray(raw)) {
         const g = raw.filter(x => x && x.cat && Array.isArray(x.items));
         const known = (Array.isArray(d) ? [] : d.known || []).map(x => RENAMED[x] || x);
-        const renamed = g.map(x => renameUrls(x.items)).some(Boolean);
+        const renamed = g.map(x => renameUrls(x.items) | applyDefaultImages(x.items)).some(Boolean);
         if (mergeDefaults(g, known) || renamed) saveCatalog(g);
         return g;
       }
@@ -1177,11 +1199,12 @@ async function askIcon(app) {
   }
   if (k === 2) {
     const t = await askText("SF Symbols の名前", "「SF Symbols」アプリで探せます。例：book.closed", app.icon, "名前");
-    if (t) { app.icon = t; delete app.image; }
+    if (t) { app.icon = t; delete app.image; app.noBuiltin = true; }
     return;
   }
   app.icon = ICONS[k - 3];
   delete app.image;
+  app.noBuiltin = true;   // 初期の画像を入れ直さない
 }
 
 async function askStyle(current) {

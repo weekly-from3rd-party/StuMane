@@ -68,7 +68,7 @@ const fmOf = root => ({ documentsDirectory: () => root, joinPath: (a, b) => a.re
 const FileManager = { local: () => fmOf('/docs'), iCloud: () => fmOf('/icloud') };
 const reset = () => { FILES.clear(); DIRS.clear(); };
 const REG = new Map(); let RID = 0;
-const Data = { fromPNG: img => { if (!img || !img.__img) throw new TypeError('fromPNG'); const id = 'SYN' + (++RID); REG.set(id, img); return { toBase64String: () => id }; } };
+const Data = { fromBase64String: s => { if (typeof s !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(s)) throw new TypeError('fromBase64String'); return { __b64: s }; }, fromPNG: img => { if (!img || !img.__img) throw new TypeError('fromPNG'); const id = 'SYN' + (++RID); REG.set(id, img); return { toBase64String: () => id }; } };
 class WebView {
   loadHTML(h) { if (typeof h !== 'string') throw new TypeError('loadHTML'); this.ok = true; this.html = h; return Promise.resolve(); }
   evaluateJavaScript(js, cb) {
@@ -140,7 +140,7 @@ async function run(o) {
   // WebView を表示したとき：o.web(html) が返すものをページの window とする（ページでの操作の結果を模擬）
   class WV extends WebView { async present(full) { if (full !== undefined && typeof full !== 'boolean') throw new TypeError('present'); if (!this.ok) throw new Error('present before load'); log.push('webview'); this.win = o.web ? o.web(this.html) : {}; } }
   const scr = o.pad ? [834, 1194] : (o.screen || [393, 852]);
-  const ctx = vm.createContext({ Date: FDate, Color, Size, Rect, Point, Font, DrawContext, ListWidget, Alert, FileManager, Data, WebView: WV, console, Reminder, Calendar, SFSymbol,
+  const ctx = vm.createContext({ Date: FDate, Color, Size, Rect, Point, Font, DrawContext, ListWidget, Alert, FileManager, Data, WebView: WV, Image: { fromData: d => { if (!d || !d.__b64) throw new TypeError('Image.fromData'); return { __img: true, size: new Size(180, 180), name: 'b64' }; } }, console, Reminder, Calendar, SFSymbol,
     UITable, UITableRow, UITableCell,
     Safari: { open: u => { if (!okUrl(u)) throw new TypeError('Safari.open ' + u); log.push('open ' + u); } },
     URLScheme: { forRunningScript: () => 'scriptable:///run?scriptName=' + encodeURIComponent(o.scriptName || 'Widget') },
