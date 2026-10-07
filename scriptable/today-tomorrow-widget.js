@@ -222,9 +222,16 @@ function xlColumn(parent, day, D) {
   addText(lab, WEEK[day.start.getDay()], mono(11), P.dim);
   h.addSpacer();
   col.addSpacer(12);
-  const list = day.isToday ? day.events.filter(e => !e.past) : day.events;
+  const list = day.isToday ? withLastDone(day.events) : day.events;
   renderList(col, day, fitSection(list, 262, s, 0), s);
   col.addSpacer();
+}
+
+// 特大の今日：終わった予定のうち、いちばん最後に終わった 1 件だけ残す（薄字＋DONE。2026-10-07 ユーザー依頼）
+function withLastDone(events) {
+  const done = events.filter(e => e.past);
+  const last = done.reduce((a, e) => (!a || e.end > a.end || (+e.end === +a.end && e.start > a.start) ? e : a), null);
+  return events.filter(e => !e.past || e === last);
 }
 
 // ---------- 大：今日・明日を上下に ----------
@@ -415,10 +422,12 @@ function addEventRow(parent, e, s, url) {
   mark.size = new Size(s.mark, s.mark);
   mark.cornerRadius = s.mark / 2;
   mark.backgroundColor = e.hl ? P.accent : Color.clear();
-  fixedText(l1, e.startLabel, mono(s.startSize, "medium"), e.hl ? P.accent : P.ink, s.timeW);
-  addText(l1, e.title, sys(s.titleSize, "medium"), P.ink);
+  const ink = e.past ? P.faint : P.ink;   // 終わった予定（特大だけに出る）は薄字
+  fixedText(l1, e.startLabel, mono(s.startSize, "medium"), e.hl ? P.accent : ink, s.timeW);
+  addText(l1, e.title, sys(s.titleSize, "medium"), ink);
   l1.addSpacer();
   if (s.tag && e.hl) addText(l1, e.current ? "NOW" : "NEXT", mono(9, "semibold"), P.accent);
+  else if (s.tag && e.past) addText(l1, "DONE", mono(9, "semibold"), P.faint);
 
   if (!hasLine2(e)) return;
   const l2 = hstack(row);
@@ -426,8 +435,8 @@ function addEventRow(parent, e, s, url) {
   l2.spacing = s.gap;
   const pad = l2.addStack();            // マーカーの下は空ける
   pad.size = new Size(s.mark, 0);
-  fixedText(l2, e.endLabel, mono(s.endSize), P.dim, s.timeW);
-  if (e.loc) addText(l2, e.loc, sys(s.locSize), P.dim);
+  fixedText(l2, e.endLabel, mono(s.endSize), e.past ? P.faint : P.dim, s.timeW);
+  if (e.loc) addText(l2, e.loc, sys(s.locSize), e.past ? P.faint : P.dim);
   l2.addSpacer();
 }
 

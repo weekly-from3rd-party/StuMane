@@ -26,6 +26,17 @@ let fail = 0; const check = (n, ok, x = '') => { if (!ok) fail++; console.log((o
   check('前日から続く予定は「前日」', txt.includes('"前日"'));
   check('24時ちょうどは「24:00」', txt.includes('"24:00"'));
   check('翌日にまたぐ終了は「翌02:00」', txt.includes('"翌02:00"'));
+  // 終わった予定：特大の今日だけ、最後に終わった 1 件を薄字＋DONE で残す。ほかのサイズは出さない
+  r = await run({ family: 'extraLarge', now: D.T(0, 14, 30), events: D.A });
+  const xl = dump(r.w);
+  check('特大：最後に終わった 1 件だけ残す（DONE）', xl.includes('"徳永研 ミーティング"') && !xl.includes('"生物学概論"') && !xl.includes('"環境共生学演習"') && !xl.includes('"夜間観察"') && xl.includes('"DONE"'));
+  check('特大：残した予定は赤くしない（次の予定が赤）', /"バイト（無印）"/.test(xl) && (xl.match(/#ff3b30/g) || []).length >= 1 && !/"DONE"\s+<[^>]*#ff3b30/.test(xl));
+  for (const fam of ['medium', 'large']) {
+    r = await run({ family: fam, now: D.T(0, 14, 30), events: D.A });
+    check(fam + '：終わった予定は出さない', !dump(r.w).includes('"徳永研 ミーティング"') && !dump(r.w).includes('"DONE"'));
+  }
+  r = await run({ family: 'extraLarge', now: D.T(0, 0, 30), events: D.A });
+  check('特大：終わった予定が無ければ DONE なし', !dump(r.w).includes('"DONE"'));
   console.log(fail ? `\n${fail} 件失敗` : '\n全ケース OK');
   process.exitCode = fail ? 1 : 0;
 })().catch(e => { console.log('THROW', e.stack); process.exitCode = 1; });
