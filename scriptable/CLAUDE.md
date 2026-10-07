@@ -38,7 +38,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 | 追加ウィジェット 5 本 | 作成済み・**実機未確認**（2026-10-05〜06）：COUNTDOWN / TODO / HABIT / CLOCK / LAUNCHER。仕様は 4.5 章 |
 | 音楽（再生中のジャケット） | 見送り（2026-10-05）。Apple Music はショートカット自動化か Last.fm 経由でしか取れず、ユーザーが今回は不要と判断 |
 | スクリーンタイム | 見送り（2026-10-06）。iOS のデータは Scriptable・ショートカットから読めず、自動化で自前計測か手入力しかないため、ユーザーが今回は不要と判断 |
-| アプリアイコン | **未完了**：`design/nothing-white-v3.html` に線画グリフのモックがあるだけ。PNG の書き出しは未着手 |
+| アプリアイコン | 書き出し済み（2026-10-07）：`assets/icons/` に 1024px の PNG 22 個（モックの 18 個＋ドック 4 個）と一覧 `_overview.png`。白地に黒の線画（モックと同じ 52%・線幅 1.5/24）、Notion と studymanager は黒地、Claude だけ赤。角丸なしの正方形（iOS が角を丸める）。書き出しは `test/export-icons.js` |
 
 デザインの経緯：最初に Nothing（黒）・Field（生成りの方眼ノート）・Riso の 3 案を出し、Field も好評だったが、最終的に Nothing 白基調で確定した。`design/nothing-white-v3.html` が承認済みのモック。
 
@@ -198,6 +198,8 @@ test/regress.js               回帰テスト
 test/widgets.js               追加ウィジェット（5 本＋TILT＋HOURGLASS）の収まり検査と回帰テスト
 test/dump.js                  ウィジェットの中身をツリー表示（デバッグ用）
 assets/wallpaper/             待受背景 PNG（iPhone・iPad）
+assets/icons/                 アプリアイコン PNG 1024px（線画・22 個）と一覧 _overview.png
+test/export-icons.js          アイコンの書き出し（Playwright）
 design/nothing-white-v3.html  承認済みモック（ロック／ホーム画面・アイコンの線画）
 ```
 
@@ -273,7 +275,7 @@ Scriptable はパソコンで動かないため、`test/harness.js` に Scriptab
 
 ## 10. 残っているタスク
 
-1. **アプリアイコンの書き出し**（当初の依頼範囲）：`design/nothing-white-v3.html` の線画グリフを元に、ショートカット用のアイコン PNG（1024px）を作る。白タイル＋黒の線画、Notion と studymanager は黒反転、Claude だけ赤
+1. （済）アプリアイコンの書き出し → `assets/icons/`。ホーム画面に置くのはユーザーの作業（ショートカットの「ホーム画面に追加」で画像を選ぶ）
 2. 実機で見つかった表示の崩れや好みの調整（ユーザーの指示待ち）。追加ウィジェット 7 本はどれも実機未確認
 3. デザイン案だけで未着手：Scriptable の TIMER ウィジェット、CLOCK のスタンバイ版（`design/widgets-preview.html` の TIMER / STANDBY 欄）。HOURGLASS で代わりになるかユーザーに確認していない
 4. 必要に応じて：ホーム画面用の背景（白基調。待受と同じ地色 #f2f1ee・ドット格子の言語で）
