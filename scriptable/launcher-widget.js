@@ -620,6 +620,16 @@ function drawEditor(table, st) {
   head.onSelect = async () => { await setMenu(st); st.redraw(); };
   table.addRow(head);
 
+  if (set.apps.length > 1) {
+    const ro = new UITableRow();
+    ro.height = 48;
+    ro.dismissOnSelect = false;
+    const rt = ro.addText("⇅ 並べ替え", "長押しで持ち上げて、ドラッグで動かす（閉じると保存）");
+    rt.titleFont = Font.semiboldSystemFont(16);
+    rt.subtitleColor = UI.dim;
+    ro.onSelect = async () => { await reorderScreen(st); st.redraw(); };
+    table.addRow(ro);
+  }
   table.addRow(label("表示中のアプリ（" + set.apps.length + " 個）　行をタップで変更・↑↓ で並べ替え・✕ で外す"));
   if (!set.apps.length) table.addRow(label("まだアプリがありません。下の「＋ アプリを追加」から選んでください。"));
   set.apps.forEach((app, i) => {
@@ -683,6 +693,138 @@ function move(st, i, d) {
   [apps[i], apps[j]] = [apps[j], apps[i]];
   saveSets(st.sets);
   st.redraw();
+}
+
+// 「⇅ 並べ替え」：UITable は長押しのドラッグができないので、Web ページ（WebView）で並べ替える（2026-10-07 ユーザー依頼）。
+// ページの中でタイルを長押し → ドラッグ。並びは window.ORDER（元の番号の配列）に入り、閉じたときに読み出して保存する
+async function reorderScreen(st) {
+  const set = st.sets[st.cur];
+  const wv = new WebView();
+  await wv.loadHTML(reorderHtml(set.name, set.apps));
+  await wv.present(true);
+  let order = null;
+  try {
+    order = JSON.parse(await wv.evaluateJavaScript("completion(JSON.stringify(window.ORDER || null))", true));
+  } catch (e) {
+    return;   // 読み出せなければ何も変えない
+  }
+  const n = set.apps.length;
+  const ok = Array.isArray(order) && order.length === n && order.every(i => Number.isInteger(i) && i >= 0 && i < n) && new Set(order).size === n;
+  if (!ok || order.every((v, i) => v === i)) return;
+  set.apps = order.map(i => set.apps[i]);
+  saveSets(st.sets);
+}
+
+function reorderHtml(name, apps) {
+  const esc = t => String(t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const tiles = apps.map((a, i) => {
+    let pic = "";
+    try {
+      const img = a.image ? ICON_CACHE[a.image] : null;
+      if (img) pic = '<img src="data:image/png;base64,' + Data.fromPNG(img).toBase64String() + '">';
+    } catch (e) {
+      pic = "";
+    }
+    const cls = a.style === "invert" ? " inv" : a.style === "accent" ? " acc" : "";
+    return '<div class="t' + cls + '" data-i="' + i + '"><div class="ic">' + (pic || esc(String(a.label || "").slice(0, 2))) + '</div>'
+      + '<div class="lb">' + esc(a.label || "") + '</div><div class="nm">' + esc(appName(a)) + '</div></div>';
+  }).join("");
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">'
+    + '<style>'
+    + 'body{margin:0;background:#f2f1ee;color:#0d0d0d;font-family:-apple-system,sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}'
+    + 'header{position:sticky;top:0;background:#f2f1ee;padding:16px 16px 10px;z-index:2}'
+    + 'h1{margin:0;font-size:20px}p{margin:4px 0 0;color:#5c5c59;font-size:13px}'
+    + 'button{margin-top:10px;border:1px solid #0d0d0d29;background:#fff;border-radius:10px;padding:8px 14px;font-size:14px;color:#0d0d0d}'
+    + '#g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px 10px;padding:14px 16px 60px}'
+    + '.t{position:relative;min-width:0;display:flex;flex-direction:column;align-items:center;touch-action:pan-y}'
+    + '.ic{width:58px;height:58px;border-radius:16px;background:#0d0d0d14;display:flex;align-items:center;justify-content:center;font:600 15px ui-monospace,monospace;overflow:hidden}'
+    + '.ic img{width:100%;height:100%;object-fit:cover}'
+    + '.inv .ic{background:#0d0d0d;color:#fff}.acc .ic{color:#ff3b30}.acc .lb{color:#ff3b30}'
+    + '.lb{margin-top:5px;font:500 11px ui-monospace,monospace;color:#5c5c59}'
+    + '.nm{font-size:10px;color:#0d0d0d73;width:100%;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}'
+    + '.t.pg::before{content:attr(data-pg);position:absolute;top:-17px;left:0;font:500 10px ui-monospace,monospace;color:#0d0d0d73;white-space:nowrap}'
+    + '.t.lift{opacity:.35}'
+    + '#ghost{position:fixed;pointer-events:none;z-index:9;transform:scale(1.12);transition:transform .12s;filter:drop-shadow(0 8px 14px #0003)}'
+    + '</style></head><body><header><h1>並べ替え：' + esc(name) + '</h1>'
+    + '<p>アイコンを長押しして持ち上げ、ドラッグで動かします。この画面を閉じると保存されます。</p>'
+    + '<button id="undo">元の並びに戻す</button></header><div id="g">' + tiles + '</div>'
+    + '<script>(' + reorderScript.toString() + ')()</script></body></html>';
+}
+
+// 並べ替えページの中で動くスクリプト（文字列にしてページに入れる）
+function reorderScript() {
+  var g = document.getElementById("g"), first = Array.prototype.slice.call(g.children);
+  var drag = null, ghost = null, timer = null, sx = 0, sy = 0, dx = 0, dy = 0;
+  function mark() {
+    var ts = Array.prototype.slice.call(g.children);
+    window.ORDER = ts.map(function (t) { return +t.getAttribute("data-i"); });
+    ts.forEach(function (t, k) {
+      var on = k > 0 && k % 8 === 0;
+      t.classList.toggle("pg", on);
+      if (on) t.setAttribute("data-pg", "── 中 " + (k / 8 + 1) + " ページ目" + (k % 16 === 0 ? "・大 " + (k / 16 + 1) + " ページ目" : ""));
+    });
+  }
+  function lift(t, x, y) {
+    drag = t;
+    var r = t.getBoundingClientRect();
+    dx = x - r.left; dy = y - r.top;
+    ghost = t.cloneNode(true);
+    ghost.id = "ghost";
+    ghost.style.width = r.width + "px";
+    ghost.style.left = r.left + "px";
+    ghost.style.top = r.top + "px";
+    document.body.appendChild(ghost);
+    t.classList.add("lift");
+    if (navigator.vibrate) navigator.vibrate(10);
+  }
+  function moveTo(x, y) {
+    ghost.style.left = (x - dx) + "px";
+    ghost.style.top = (y - dy) + "px";
+    var el = document.elementFromPoint(x, y);
+    var over = el && el.closest ? el.closest(".t") : null;
+    if (!over || over === drag || over.id === "ghost") return;
+    var ts = Array.prototype.slice.call(g.children);
+    if (ts.indexOf(over) > ts.indexOf(drag)) g.insertBefore(drag, over.nextSibling);
+    else g.insertBefore(drag, over);
+    mark();
+    var h = window.innerHeight;   // 端に近づいたら自動でスクロール
+    if (y > h - 60) window.scrollBy(0, 12);
+    if (y < 120) window.scrollBy(0, -12);
+  }
+  function drop() {
+    clearTimeout(timer);
+    timer = null;
+    if (!drag) return;
+    drag.classList.remove("lift");
+    if (ghost) ghost.remove();
+    drag = null; ghost = null;
+    mark();
+  }
+  g.addEventListener("touchstart", function (e) {
+    var t = e.target.closest(".t");
+    if (!t) return;
+    var p = e.touches[0];
+    sx = p.clientX; sy = p.clientY;
+    timer = setTimeout(function () { lift(t, sx, sy); }, 350);
+  }, { passive: true });
+  document.addEventListener("touchmove", function (e) {
+    var p = e.touches[0];
+    if (drag) {
+      e.preventDefault();
+      moveTo(p.clientX, p.clientY);
+    } else if (timer && (Math.abs(p.clientX - sx) > 8 || Math.abs(p.clientY - sy) > 8)) {
+      clearTimeout(timer);   // 長押しの前に指が動いたらスクロール
+      timer = null;
+    }
+  }, { passive: false });
+  document.addEventListener("touchend", drop);
+  document.addEventListener("touchcancel", drop);
+  document.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  document.getElementById("undo").addEventListener("click", function () {
+    first.forEach(function (t) { g.appendChild(t); });
+    mark();
+  });
+  mark();
 }
 
 // 「＋ アプリを追加」：種類ごとの一覧。タップで入れる・外す（✓ が入っている印）

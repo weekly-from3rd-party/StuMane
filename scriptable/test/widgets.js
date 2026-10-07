@@ -256,7 +256,7 @@ const CASES = {
   // ui：開いた一覧画面ごとの操作。tap(table, 文字) で行を選ぶ、btn(table, 文字, ボタン) で行のボタンを押す
   const tap = (tb, text) => { const r = tb.find(text); return r.onSelect(tb.rows.indexOf(r)); };
   const btn = (tb, text, b) => tb.find(text).cells.find(c => c.type === 'button' && c.title === b).onTap();
-  const edit = (ui, opt = {}) => run({ file: L, app: true, now: T(1, 10), sheets: [1].concat(opt.sheets || []), texts: opt.texts, alerts: opt.alerts, photos: opt.photos, ui });
+  const edit = (ui, opt = {}) => run({ file: L, app: true, now: T(1, 10), sheets: [1].concat(opt.sheets || []), texts: opt.texts, alerts: opt.alerts, photos: opt.photos, web: opt.web, ui });
   reset();
   let seen = [];
   await edit([async tb => { seen = tb.lines(); }]);
@@ -268,6 +268,16 @@ const CASES = {
   check('LAUNCHER セットを作る → 追加画面でタップして入れる・外す（✓）', (await lUrls('勉強')).join(' ') === 'notion:// youtube://' && seen.some(l => l.includes('YT') && l.endsWith('✓')) && seen.some(l => l.startsWith('LINE') && !l.endsWith('✓')),
     (await lUrls('勉強')).join(' '));
   check('LAUNCHER 追加画面は種類ごと（Apple のアプリ／勉強・仕事／AI／SNS・連絡／エンタメ／買い物・お金／生活・その他）', ['Apple のアプリ', '勉強・仕事', 'AI', 'SNS・連絡', 'エンタメ', '買い物・お金', '生活・その他'].every(c => seen.includes(c)));
+  // ⇅ 並べ替え（WebView）：ページでの並びを閉じたときに読み出して保存。ページの中身も確かめる
+  let page = '';
+  await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, '⇅ 並べ替え'); }], { sheets: [0], web: html => { page = html; return { ORDER: [1, 0] }; } });
+  const js = (page.match(/<script>([\s\S]*)<\/script>/) || [])[1] || '';
+  let parsed = true; try { new Function(js); } catch (e) { parsed = false; }
+  check('LAUNCHER 並べ替え：長押しドラッグのページ（タイル・日本語名・元に戻す）を開き、閉じたら並びを保存', (await lUrls('勉強')).join(' ') === 'youtube:// notion://'
+    && (page.match(/class="t[^"]*" data-i=/g) || []).length === 2 && page.includes('YouTube') && page.includes('元の並びに戻す') && parsed && js.includes('touchstart'), (await lUrls('勉強')).join(' '));
+  await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, '⇅ 並べ替え'); }], { sheets: [0], web: () => ({ ORDER: [0, 0] }) });
+  check('LAUNCHER 並べ替え：おかしな並びは保存しない', (await lUrls('勉強')).join(' ') === 'youtube:// notion://');
+  await edit([async tb => { await tap(tb, 'セット：すべて'); await tap(tb, '⇅ 並べ替え'); }], { sheets: [0], web: () => ({ ORDER: [1, 0] }) });
   // ↑ で並べ替え、✕ で外す、行のタップで表示名を変える
   await edit([async tb => { await tap(tb, 'セット：すべて'); btn(tb, 'YT', '↑'); }], { sheets: [0] });
   check('LAUNCHER ↑ で並べ替え', (await lUrls('勉強')).join(' ') === 'youtube:// notion://');

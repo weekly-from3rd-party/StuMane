@@ -70,13 +70,13 @@ const reset = () => { FILES.clear(); DIRS.clear(); };
 const REG = new Map(); let RID = 0;
 const Data = { fromPNG: img => { if (!img || !img.__img) throw new TypeError('fromPNG'); const id = 'SYN' + (++RID); REG.set(id, img); return { toBase64String: () => id }; } };
 class WebView {
-  loadHTML(h) { if (typeof h !== 'string') throw new TypeError('loadHTML'); this.ok = true; return Promise.resolve(); }
+  loadHTML(h) { if (typeof h !== 'string') throw new TypeError('loadHTML'); this.ok = true; this.html = h; return Promise.resolve(); }
   evaluateJavaScript(js, cb) {
     if (!this.ok || cb !== true) throw new Error('webview misuse');
     return new Promise((resolve, reject) => {
       class FakeImage { set src(v) { const img = REG.get(v.split('base64,')[1]); setTimeout(() => { if (!img) return this.onerror(); this.width = img.size.width; this.height = img.size.height; this.__img = img; this.onload(); }, 0); } }
       const canvas = { getContext: () => ({ drawImage(im) { this.im = im; }, getImageData() { return { data: this.im.__img.rgba }; } }) };
-      try { vm.runInContext(js, vm.createContext({ Image: FakeImage, document: { getElementById: () => canvas }, completion: resolve, setTimeout })); } catch (e) { reject(e); }
+      try { vm.runInContext(js, vm.createContext({ Image: FakeImage, document: { getElementById: () => canvas }, completion: resolve, setTimeout, window: this.win || {}, JSON })); } catch (e) { reject(e); }
     });
   }
 }
@@ -137,8 +137,10 @@ async function run(o) {
     completedToday: async c => rems().filter(r => r.isCompleted && r.completionDate && sameDay(r.completionDate, new FDate()) && inCals(r, c)),
     allIncomplete: async c => rems().filter(r => !r.isCompleted && inCals(r, c)) };
   const Calendar = { forRemindersByTitle: async t => { if (rems().some(r => r.calendar.title === t)) return { title: t }; throw new Error('no list ' + t); } };
+  // WebView を表示したとき：o.web(html) が返すものをページの window とする（ページでの操作の結果を模擬）
+  class WV extends WebView { async present(full) { if (full !== undefined && typeof full !== 'boolean') throw new TypeError('present'); if (!this.ok) throw new Error('present before load'); log.push('webview'); this.win = o.web ? o.web(this.html) : {}; } }
   const scr = o.pad ? [834, 1194] : (o.screen || [393, 852]);
-  const ctx = vm.createContext({ Date: FDate, Color, Size, Rect, Point, Font, DrawContext, ListWidget, Alert, FileManager, Data, WebView, console, Reminder, Calendar, SFSymbol,
+  const ctx = vm.createContext({ Date: FDate, Color, Size, Rect, Point, Font, DrawContext, ListWidget, Alert, FileManager, Data, WebView: WV, console, Reminder, Calendar, SFSymbol,
     UITable, UITableRow, UITableCell,
     Safari: { open: u => { if (!okUrl(u)) throw new TypeError('Safari.open ' + u); log.push('open ' + u); } },
     URLScheme: { forRunningScript: () => 'scriptable:///run?scriptName=' + encodeURIComponent(o.scriptName || 'Widget') },
