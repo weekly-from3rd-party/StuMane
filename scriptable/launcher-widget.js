@@ -78,9 +78,7 @@ const THEME = PARAMS.map(p => p.toLowerCase()).find(p => p === "dark" || p === "
 const CLEAR = PARAMS.some(p => /^(透明|clear)$/i.test(p));
 const PAGE = Math.max(1, parseInt(PARAMS.find(p => /^\d+$/.test(p)) || "1", 10));
 // 数字・dark・透明 以外はセット名
-// Parameter「閉じる」：ショートカット「ランチャー」経由で開き、iPad のウインドウ表示で後ろに残る Scriptable を画面から外す（試験的・2026-10-07）
-const CLOSE_AFTER = PARAMS.some(p => /^(閉じる|close)$/i.test(p));
-const SET_NAME = PARAMS.find(p => !/^\d+$/.test(p) && !/^(dark|light|透明|clear|閉じる|close)$/i.test(p)) || "";
+const SET_NAME = PARAMS.find(p => !/^\d+$/.test(p) && !/^(dark|light|透明|clear)$/i.test(p)) || "";
 
 // ---------- 色（Nothing デザインテンプレ：白基調） ----------
 const PALETTES = {
@@ -174,7 +172,7 @@ async function small(w, set, now) {
     return w;
   }
   await loadIcons([app]);
-  w.url = tapUrl(app, now);
+  w.url = appUrl(app, now);
   w.addSpacer();
   addTile(w, app, { icon: 76, tileW: 120, label: 12 }, now, false);
   w.addSpacer();
@@ -216,7 +214,7 @@ function grid(parent, apps, g, now, tap) {
 function addTile(parent, app, g, now, tap) {
   const t = vstack(parent);
   t.size = new Size(g.tileW, 0);
-  if (tap) t.url = tapUrl(app, now);
+  if (tap) t.url = appUrl(app, now);
   const top = hstack(t);
   top.addSpacer();
   const tile = hstack(top);
@@ -266,15 +264,6 @@ function symbol(name, size) {
   const dc = new DrawContext();
   dc.size = new Size(1, 1);
   return dc.getImage();
-}
-
-// タップ先：ふつうはアプリの URL。Parameter「閉じる」なら、ショートカット「ランチャー」に URL を渡して開いてもらう。
-// ショートカットが「ホーム画面に移動」→「URL を開く」と動き、iPad のウインドウ表示で後ろに残る Scriptable を画面から外す（2026-10-07・試験的。App.close は効かなかった）
-const CLOSER = "ランチャー";
-function tapUrl(app, now) {
-  const u = appUrl(app, now);
-  if (!CLOSE_AFTER) return u;
-  return "shortcuts://run-shortcut?name=" + encodeURIComponent(CLOSER) + "&input=text&text=" + encodeURIComponent(u);
 }
 
 function appUrl(app, now) {

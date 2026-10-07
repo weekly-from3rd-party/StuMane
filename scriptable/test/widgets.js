@@ -250,12 +250,6 @@ const CASES = {
   check('HOURGLASS「だけ」：左と右は 180 度反対向き', ctr(only, (x, y) => [150 - x, 62 - y]) === ctr(onlyR, (x, y) => [x, y]));
   check('HOURGLASS 回した表示は枠の中に収まる', [only, onlyR].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)) && [tl, tr].every(img => img.ops.every(o => o.r.x >= -0.01 && o.r.y >= -0.01 && o.r.x + o.r.width <= 150.01 && o.r.y + o.r.height <= 62.01)));
 
-  // Parameter「閉じる」：タイルはショートカット「ランチャー」に URL を渡す（ホーム画面に移動 → URL を開く）
-  const viaCloser = u => 'shortcuts://run-shortcut?name=' + encodeURIComponent('ランチャー') + '&input=text&text=' + encodeURIComponent(u);
-  r = await run({ file: 'launcher-widget.js', family: 'medium', now: T(1, 10), param: '閉じる' });
-  check('LAUNCHER 閉じる：タイルはショートカット「ランチャー」経由（セット名に取らない）', urls(r.w)[2] === viaCloser('notion://') && urls(r.w).length === 8 && /text=calshow%3A\d+$/.test(urls(r.w)[0]), urls(r.w)[0]);
-  r = await run({ file: 'launcher-widget.js', family: 'small', now: T(1, 10), param: '閉じる,4' });
-  check('LAUNCHER 閉じる：小も同じ', r.w.url === viaCloser('claude://'), r.w.url);
   // ---------- LAUNCHER の編集画面（▶ メニュー：0 アプリを開く / 1 アプリを編集 / 2 小 …）----------
   const L = 'launcher-widget.js';
   const lUrls = async (param, fam = 'medium') => urls((await run({ file: L, family: fam, now: T(1, 10), param })).w);
