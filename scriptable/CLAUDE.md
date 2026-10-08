@@ -38,7 +38,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 | 追加ウィジェット 5 本 | 作成済み・**実機未確認**（2026-10-05〜06）：COUNTDOWN / TODO / HABIT / CLOCK / LAUNCHER。仕様は 4.5 章 |
 | 音楽（再生中のジャケット） | 見送り（2026-10-05）。Apple Music はショートカット自動化か Last.fm 経由でしか取れず、ユーザーが今回は不要と判断 |
 | スクリーンタイム | 見送り（2026-10-06）。iOS のデータは Scriptable・ショートカットから読めず、自動化で自前計測か手入力しかないため、ユーザーが今回は不要と判断 |
-| アプリアイコン | 書き出し済み（2026-10-07）：`assets/icons/` に 1024px の PNG 22 個（モックの 18 個＋ドック 4 個）＋追加分（microsoft365：四角 4 つの線画・2026-10-08）と一覧 `_overview.png`。白地に黒の線画（モックと同じ 52%・線幅 1.5/24）、Notion と studymanager は黒地、Claude だけ赤。角丸なしの正方形（iOS が角を丸める）。書き出しは `test/export-icons.js` |
+| アプリアイコン | 書き出し済み（2026-10-07）：`assets/icons/` に 1024px の PNG 22 個（モックの 18 個＋ドック 4 個）＋追加分（microsoft365：四角 4 つの線画／univcoop：大学生協の c・o・o・p の輪を線画に。どちらも 2026-10-08）と一覧 `_overview.png`。白地に黒の線画（モックと同じ 52%・線幅 1.5/24）、Notion と studymanager は黒地、Claude だけ赤。角丸なしの正方形（iOS が角を丸める）。書き出しは `test/export-icons.js` |
 
 デザインの経緯：最初に Nothing（黒）・Field（生成りの方眼ノート）・Riso の 3 案を出し、Field も好評だったが、最終的に Nothing 白基調で確定した。`design/nothing-white-v3.html` が承認済みのモック。
 
