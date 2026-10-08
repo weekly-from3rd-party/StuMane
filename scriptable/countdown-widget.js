@@ -13,6 +13,8 @@
         date は "YYYY-MM-DD"（その日）か "MM-DD"（毎年。誕生日など）
      2. iOS カレンダーに専用のカレンダー（例「カウントダウン」）を作り、
         その名前を CONFIG.calendars に書く → 1 年先までの予定が並ぶ
+     3. リマインダーから読む（期限のあるもの）：▶ →「リマインダーから読む」で選ぶ
+        ・優先度「高」のもの ・決めたリストのもの ・フラグ付きのもの（ショートカット経由。COUNTDOWN.md）
 
    対応サイズ
      ホーム画面：小 / 中 / 大 / 特大（iPad）
@@ -37,6 +39,8 @@ const CONFIG = {
     { title: "誕生日", date: "03-14" },
   ],
   calendars: [],    // この名前のカレンダーの予定もカウントダウンに加える（例: ["カウントダウン"]）
+  // リマインダーから読む（期限のある未完了のもの）。▶ →「リマインダーから読む」で変えると、そちらが優先（iCloud の countdown/settings.json）
+  reminders: { priority: false, lists: [], flagged: false },
 };
 const DIR = "countdown";   // 透明背景の保存先フォルダ
 
@@ -468,12 +472,115 @@ async function loadData() {
       // カレンダーが読めなくても CONFIG の分は表示する
     }
   }
+  (await reminderItems(today)).forEach(it => items.push(it));
+  const seen = new Set();   // 同じ名前・同じ日は 1 つに
+  items = items.filter(it => { const k = it.title + "|" + it.date.getTime(); if (seen.has(k)) return false; seen.add(k); return true; });
   if (TITLES.length) items = items.filter(it => TITLES.some(t => it.title.includes(t)));
   items.forEach(it => { it.days = daysBetween(today, it.date); it.hl = false; });
   items = items.filter(it => it.days >= 0);
   items.sort((a, b) => (a.days - b.days) || a.title.localeCompare(b.title));
   if (items.length) items[0].hl = true;
   return { now, today, items, periods: periods(now) };
+}
+
+// ---------- リマインダーから読む（2026-10-08 ユーザー依頼：優先度「高」・リスト・フラグを自分で選ぶ） ----------
+// Scriptable はリマインダーのフラグを読めないので、フラグ付きはショートカットが名前の一覧を渡して保存しておく（flagged.json）
+function store() {
+  try {
+    return FileManager.iCloud();
+  } catch (e) {
+    return FileManager.local();
+  }
+}
+
+function dataPath(fm, name) {
+  return fm.joinPath(fm.joinPath(fm.documentsDirectory(), DIR), name);
+}
+
+async function readJson(name, fallback) {
+  const fm = store();
+  const p = dataPath(fm, name);
+  if (!fm.fileExists(p)) return fallback;
+  try {
+    await fm.downloadFileFromiCloud(p);
+    return JSON.parse(fm.readString(p));
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function writeJson(name, value) {
+  const fm = store();
+  const dir = fm.joinPath(fm.documentsDirectory(), DIR);
+  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+  fm.writeString(dataPath(fm, name), JSON.stringify(value));
+}
+
+async function reminderSettings() {
+  const d = CONFIG.reminders || {};
+  const s = await readJson("settings.json", null);
+  const r = s && s.reminders ? s.reminders : d;
+  return { priority: !!r.priority, lists: Array.isArray(r.lists) ? r.lists.map(String) : [], flagged: !!r.flagged };
+}
+
+async function reminderItems(today) {
+  const st = await reminderSettings();
+  if (!st.priority && !st.lists.length && !st.flagged) return [];
+  let flagged = [];
+  if (st.flagged) {
+    const f = await readJson("flagged.json", null);
+    flagged = f && Array.isArray(f.titles) ? f.titles.map(t => clean(t)) : [];
+  }
+  let rems = [];
+  try {
+    rems = await Reminder.allIncomplete();
+  } catch (e) {
+    return [];   // リマインダーが読めなくても、ほかの分は表示する
+  }
+  return rems.filter(r => r.dueDate && dayStart(r.dueDate, 0) >= today).filter(r =>
+    (st.priority && r.priority >= 1 && r.priority <= 4)   // iOS の優先度「高」は 1〜4
+    || (st.lists.length && r.calendar && st.lists.includes(r.calendar.title))
+    || (st.flagged && flagged.includes(clean(r.title))))
+    .map(r => ({ title: clean(r.title), date: dayStart(r.dueDate, 0) }));
+}
+
+// ショートカットから：フラグ付きリマインダーの名前（一覧・改行区切り・リマインダーそのもの）を受け取って保存する
+function saveFlagged(input) {
+  const list = Array.isArray(input) ? input : String(input == null ? "" : input).split(/\r?\n/);
+  const titles = list.map(x => (x && typeof x === "object" && x.title) ? x.title : x).map(x => String(x == null ? "" : x).trim()).filter(Boolean);
+  writeJson("flagged.json", { titles, at: new Date().getTime() });
+  return titles.length;
+}
+
+// ▶ →「リマインダーから読む」：3 つを自分でオン・オフ
+async function editReminderSettings() {
+  const st = await reminderSettings();
+  for (;;) {
+    const mark = on => (on ? "✓ " : "　 ");
+    const k = await sheet("リマインダーから読む（期限のあるものだけ）", [
+      mark(st.priority) + "優先度「高」のもの",
+      mark(st.lists.length) + "リストのもの：" + (st.lists.length ? st.lists.join("・") : "なし"),
+      mark(st.flagged) + "フラグ付きのもの（ショートカット経由）",
+      "保存して閉じる",
+    ]);
+    if (k < 0) return;
+    if (k === 3) break;
+    if (k === 0) st.priority = !st.priority;
+    if (k === 1) {
+      const a = new Alert();
+      a.title = "どのリストを読む？";
+      a.message = "リマインダーのリスト名。複数なら読点（、）で区切る。空にするとオフ。";
+      a.addTextField("例：カウントダウン", st.lists.join("、"));
+      a.addAction("決定");
+      a.addCancelAction("キャンセル");
+      if ((await a.presentAlert()) === 0) st.lists = String(a.textFieldValue(0) || "").split(/[,、]/).map(x => x.trim()).filter(Boolean);
+    }
+    if (k === 2) {
+      st.flagged = !st.flagged;
+      if (st.flagged) await notice("ショートカットが必要です", "Scriptable はフラグを読めないので、ショートカット「カウントダウンのフラグ」が名前の一覧を渡します。作り方は COUNTDOWN.md にあります。");
+    }
+  }
+  writeJson("settings.json", { reminders: st });
 }
 
 // "YYYY-MM-DD"（その日）/ "MM-DD"（毎年。過ぎていれば来年）
@@ -870,7 +977,7 @@ async function pickPhoto() {
 async function chooseAction() {
   const opts = [["小", "small"], ["中", "medium"], ["大", "large"]];
   if (Device.isPad()) opts.push(["特大", "extraLarge"]);
-  opts.push(["ロック画面（長方形）", "accessoryRectangular"], ["透明背景を設定", "setup-clear"]);
+  opts.push(["ロック画面（長方形）", "accessoryRectangular"], ["リマインダーから読む", "reminders"], ["透明背景を設定", "setup-clear"]);
   const i = await sheet("プレビュー・設定", opts.map(o => o[0]));
   return i >= 0 ? opts[i][1] : null;
 }
@@ -890,8 +997,13 @@ async function preview(w, family) {
 // ============================================================
 // 実行（ファイルの最後に置くこと）
 // ============================================================
-const family = config.widgetFamily || (config.runsInApp ? await chooseAction() : "medium");
-if (family === "setup-clear") {
+const FROM_SHORTCUT = args.shortcutParameter !== null && args.shortcutParameter !== undefined;
+const family = FROM_SHORTCUT ? "flagged" : config.widgetFamily || (config.runsInApp ? await chooseAction() : "medium");
+if (family === "flagged") {
+  Script.setShortcutOutput("フラグ付き " + saveFlagged(args.shortcutParameter) + " 件を保存しました");
+} else if (family === "reminders") {
+  await editReminderSettings();
+} else if (family === "setup-clear") {
   await setupClear();
 } else if (family) {
   const widget = await makeWidget(family);

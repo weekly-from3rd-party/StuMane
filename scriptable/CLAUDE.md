@@ -77,7 +77,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 
 | | COUNTDOWN | TODO | HABIT |
 |---|---|---|---|
-| データ | `CONFIG.events`（`YYYY-MM-DD`＝その日／`MM-DD`＝毎年）＋任意で `CONFIG.calendars` のカレンダー（1 年先まで） | iOS リマインダー：期限が今日まで（期限切れ含む）の未完了、明日が期限、今日完了した数。`CONFIG.undated` で期限なしも | 習慣の一覧（`habit/habits.json`、無ければ `CONFIG.habits`）の名前ごとに日付の配列。iCloud の `habit/records.json`（iPhone・iPad 共有、400 日分） |
+| データ | `CONFIG.events`（`YYYY-MM-DD`＝その日／`MM-DD`＝毎年）＋任意で `CONFIG.calendars` のカレンダー（1 年先まで）＋任意でリマインダー（下の注） | iOS リマインダー：期限が今日まで（期限切れ含む）の未完了、明日が期限、今日完了した数。`CONFIG.undated` で期限なしも | 習慣の一覧（`habit/habits.json`、無ければ `CONFIG.habits`）の名前ごとに日付の配列。iCloud の `habit/records.json`（iPhone・iPad 共有、400 日分） |
 | 赤 | 最も近い 1 件（D-数） | 最も急ぐ 1 件（期限切れ→時刻順→日付だけ。同順は優先度） | 今日まだの習慣のうち上の 1 つ（今日の点が赤い輪） |
 | 小 | 最も近い 1 件（NEXT・ドット日数・名前 2 行）＋下段に今年の残り。Parameter `年`/`月`/`週` で残り時間の表示 | 残り件数（ドット）・DONE 数・上から 3 件 | 1 つ目の習慣：連続日数（ドット）・直近 7 日の点と曜日・TODAY 記録済み／タップで記録 |
 | 中 | 左：今年あと○日・点の進捗・% ／右：カウントダウン一覧（`● D-12 名前 日付`） | 左：残り件数・TODO・DONE n/m ／右：1 行ずつ（`○ 名前 …… 14:00/LATE`）、余白に TOMORROW | 1 行ずつ：名前・直近 7 日の点・連続日数。行タップで記録 |
@@ -87,6 +87,7 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 | Parameter | 名前の一部で絞り込み／`年` `月` `週` | リスト名で絞り込み | 習慣名で絞り込み |
 
 - 残り日数は「今日を除く」（10/05 なら今年あと 87 日）。週は月曜はじまり。当日のカウントダウンは TODAY / D-DAY、過ぎたものは出さない
+- COUNTDOWN のリマインダー（2026-10-08 ユーザー依頼「フラグ付きに対応」→「自分で選択できるように」）：期限のある未完了のリマインダーを、▶ →「リマインダーから読む」で選んだ条件（優先度「高」＝priority 1〜4／リスト名／フラグ付き）で足す。設定は iCloud の `countdown/settings.json`（無ければ `CONFIG.reminders`）。**Scriptable はフラグを読めない**ので、ショートカット（リマインダーを検索：フラグ付き・未完了 → Run Script）が名前の一覧を `args.shortcutParameter` で渡し、`countdown/flagged.json` に保存。期限は描き直しのたびにリマインダーから読む。同じ名前・同じ日は 1 つに。手順は `COUNTDOWN.md`
 - HABIT の連続日数：今日済みなら今日から、まだなら昨日から数える（今日の途中で 0 に戻らない）
 - HABIT は ▶ メニューに「今日の記録をつける」「過去 7 日の記録を直す」。記録の反映には iOS の更新を待つので少し遅れることがある
 - HABIT はスクリプト名がタップ先の URL に入るため、名前を変えたらウィジェットを置き直す
@@ -188,6 +189,7 @@ launcher-widget.js            アプリランチャー
 tilt-clock-widget.js          90 度回した時計（ロック画面用・30 分刻み）
 hourglass-widget.js           iOS タイマーと連動する砂時計
 HOURGLASS.md                  砂時計のショートカットの作り方（ユーザー向け）
+COUNTDOWN.md                  カウントダウンにリマインダーを出す設定・フラグ用ショートカット（ユーザー向け）
 LAUNCHER-SHORTCUTS.md         よく使うアプリをショートカットのウィジェットに置く手順（ユーザー向け）
 CLAUDE.md                     この文書
 package.json                  npm test / npm run dump

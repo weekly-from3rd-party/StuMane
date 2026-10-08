@@ -74,6 +74,24 @@ const CASES = {
   r = await run({ file: 'countdown-widget.js', family: 'large', now: T(0, 10, 30) });
   t = dump(r.w);
   check('COUNTDOWN 大：今月・今週・今日の残り', t.includes('"あと 26日"') && t.includes('"あと 6日"') && t.includes('"あと 13時間"'));
+  // リマインダーから読む：優先度「高」・リスト・フラグ（ショートカットが名前を渡す）を自分で選ぶ
+  const C = 'countdown-widget.js';
+  const rem = (title, d, extra = {}) => Object.assign({ title, dueDate: T(d, 9), dueDateIncludesTime: false, isCompleted: false, priority: 0, calendar: { title: 'リマインダー' } }, extra);
+  const REMS = [rem('レポート提出', 3, { priority: 1 }), rem('英検', 20, { calendar: { title: 'カウントダウン' } }), rem('ライブ', 40), rem('期限なし', 0, { dueDate: null }), rem('ふつうの用事', 5)];
+  const cdTexts = async () => dump((await run({ file: C, family: 'large', now: T(0, 10, 30), reminders: REMS })).w);
+  reset();
+  check('COUNTDOWN リマインダー：初期はどれも読まない', !(await cdTexts()).includes('レポート提出'));
+  await run({ file: C, app: true, now: T(0, 10, 30), reminders: REMS, sheets: [4, 0, 1, 3], texts: ['カウントダウン'] });
+  let ct = await cdTexts();
+  check('COUNTDOWN リマインダー：優先度「高」とリストを選ぶと出る（期限の日まで）', ct.includes('"レポート提出"') && ct.includes('"英検"') && ct.includes('"D-3"') && !ct.includes('ライブ') && !ct.includes('ふつうの用事'), JSON.stringify(FILES.get('/icloud/countdown/settings.json')));
+  r = await run({ file: C, now: T(0, 10, 30), shortcut: ['ライブ', '期限なし'] });
+  check('COUNTDOWN フラグ：ショートカットから名前を受け取って保存', r.log.includes('output ' + JSON.stringify('フラグ付き 2 件を保存しました')), r.log.join(' | '));
+  ct = await cdTexts();
+  check('COUNTDOWN フラグ：オフのうちは出さない', !ct.includes('"ライブ"'));
+  await run({ file: C, app: true, now: T(0, 10, 30), reminders: REMS, sheets: [4, 0, 2, 3] });
+  ct = await cdTexts();
+  check('COUNTDOWN フラグ：オンにすると出る（優先度はオフに戻した）', ct.includes('"ライブ"') && ct.includes('"英検"') && !ct.includes('"レポート提出"') && !ct.includes('期限なし'));
+  reset();
 
   // ---------- TODO ----------
   r = await run({ file: 'todo-widget.js', family: 'medium', now: T(0, 10, 30), reminders: REM.A });
