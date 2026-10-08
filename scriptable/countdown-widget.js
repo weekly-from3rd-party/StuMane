@@ -8,8 +8,12 @@
    「今年あと○日」などの残り時間と、試験日・旅行・誕生日などの
    カウントダウンを表示します（Scriptable 用）。
 
-   カウントダウンの登録（どちらか、または両方）
-     1. 下の CONFIG.events に書く
+   カウントダウンの登録
+     ★ いちばん簡単：▶ →「カウントダウンを編集」（コードは触らない）
+        カレンダーの予定・リマインダーを一覧からタップで選ぶ／名前と日付を自分で入れる
+        （iCloud の countdown/items.json に保存。iPhone と iPad で同じ）
+     ほかの方法
+     1. 下の CONFIG.events に書く（「カウントダウンを編集」を一度開くと一覧に移り、以後は一覧が使われる）
         date は "YYYY-MM-DD"（その日）か "MM-DD"（毎年。誕生日など）
      2. iOS カレンダーに専用のカレンダー（例「カウントダウン」）を作り、
         その名前を CONFIG.calendars に書く → 1 年先までの予定が並ぶ
@@ -459,7 +463,9 @@ async function loadData() {
   const now = new Date();
   const today = dayStart(now, 0);
   let items = [];
-  CONFIG.events.forEach(e => {
+  const saved = await readJson("items.json", null);
+  if (Array.isArray(saved)) (await resolveItems(saved, today)).forEach(it => items.push(it));
+  else CONFIG.events.forEach(e => {
     const date = parseDate(String(e.date || ""), today);
     if (date) items.push({ title: clean(e.title), date });
   });
@@ -581,6 +587,234 @@ async function editReminderSettings() {
     }
   }
   writeJson("settings.json", { reminders: st });
+}
+
+// ---------- ▶ →「カウントダウンを編集」：コードを触らずに、一覧から選ぶ（2026-10-08 ユーザー依頼） ----------
+// items.json：[{ title, src: "cal" | "rem" | "manual", id, date }]。cal・rem は id で元の予定を探し直し、日付は元に合わせる
+// （元の予定を消した・リマインダーを完了にした → 出さない）。manual の date は "YYYY-MM-DD" か毎年の "MM-DD"
+function idOf(e) {
+  return String(e.identifier || (e.title + "@" + new Date(e.startDate || e.dueDate).getTime()));
+}
+
+function ymd(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+
+async function calendarEvents(today) {
+  try {
+    return await CalendarEvent.between(today, dayStart(today, 366));
+  } catch (e) {
+    return [];
+  }
+}
+
+async function dueReminders() {
+  try {
+    return (await Reminder.allIncomplete()).filter(r => r.dueDate);
+  } catch (e) {
+    return [];
+  }
+}
+
+async function resolveItems(saved, today) {
+  const out = [];
+  const needCal = saved.some(x => x.src === "cal"), needRem = saved.some(x => x.src === "rem");
+  const evs = needCal ? await calendarEvents(today) : [];
+  const rems = needRem ? await dueReminders() : [];
+  saved.forEach(x => {
+    if (x.src === "cal") {
+      // 同じ予定（繰り返しなら同じ id が並ぶ）のうち、登録した日にいちばん近いもの
+      const same = evs.filter(e => idOf(e) === x.id && e.startDate >= today);
+      if (!same.length) return;
+      const want = new Date(x.date + "T00:00:00").getTime();
+      const e = same.reduce((a, b) => (Math.abs(b.startDate - want) < Math.abs(a.startDate - want) ? b : a));
+      out.push({ title: clean(x.title), date: dayStart(e.startDate, 0) });
+    } else if (x.src === "rem") {
+      const r = rems.find(v => idOf(v) === x.id);
+      if (r) out.push({ title: clean(x.title), date: dayStart(r.dueDate, 0) });
+    } else {
+      const date = parseDate(String(x.date || ""), today);
+      if (date) out.push({ title: clean(x.title), date });
+    }
+  });
+  return out;
+}
+
+const UI = { dim: new Color("#5c5c59"), faint: new Color("#0d0d0d", 0.45), accent: new Color("#ff3b30"), ground: new Color("#f2f1ee") };
+const SRC_NAME = { cal: "カレンダー", rem: "リマインダー", manual: "自分で入力" };
+const WEEK_JA = ["日", "月", "火", "水", "木", "金", "土"];
+
+function uiLabel(text) {
+  const row = new UITableRow();
+  row.height = 40;
+  const t = row.addText(text);
+  t.titleFont = Font.systemFont(13);
+  t.titleColor = UI.dim;
+  return row;
+}
+
+function uiAction(title, sub, fn) {
+  const row = new UITableRow();
+  row.height = 52;
+  row.dismissOnSelect = false;
+  const t = row.addText(title, sub);
+  t.titleFont = Font.semiboldSystemFont(17);
+  t.subtitleColor = UI.dim;
+  row.onSelect = fn;
+  return row;
+}
+
+function shortDate(x) {
+  const m = String(x.date || "").match(/^(?:(\d{4})-)?(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  return m[2] + "." + m[3] + (m[1] ? "" : "（毎年）");
+}
+
+async function loadItemsForEdit() {
+  const saved = await readJson("items.json", null);
+  if (Array.isArray(saved)) return saved;
+  // 初めて：CONFIG.events を一覧に移す
+  return CONFIG.events.map(e => ({ title: clean(e.title), src: "manual", date: String(e.date || "") })).filter(x => x.date);
+}
+
+async function editItems() {
+  const items = await loadItemsForEdit();
+  const save = () => writeJson("items.json", items);
+  save();
+  const table = new UITable();
+  table.showSeparators = true;
+  const draw = () => {
+    table.removeAllRows();
+    table.addRow(uiLabel("登録中のカウントダウン（" + items.length + " 件）　行をタップで名前を変える・✕ で外す"));
+    if (!items.length) table.addRow(uiLabel("まだありません。下から選んでください。"));
+    items.forEach((x, i) => {
+      const row = new UITableRow();
+      row.height = 54;
+      row.dismissOnSelect = false;
+      const t = row.addText(x.title, shortDate(x) + "　" + (SRC_NAME[x.src] || ""));
+      t.widthWeight = 85;
+      t.titleFont = Font.mediumSystemFont(16);
+      t.subtitleColor = UI.dim;
+      const del = row.addButton("✕");
+      del.widthWeight = 15;
+      del.onTap = () => { items.splice(i, 1); save(); draw(); };
+      row.onSelect = async () => {
+        const name = await askText("名前を変える", "ウィジェットに出る名前です。", x.title);
+        if (name) { x.title = name; save(); }
+        draw();
+      };
+      table.addRow(row);
+    });
+    table.addRow(uiAction("＋ カレンダーの予定から選ぶ", "1 年先までの予定。タップで入れる・外す", async () => { await pickFrom("cal", items, save); draw(); }));
+    table.addRow(uiAction("＋ リマインダーから選ぶ", "期限のある未完了のもの。タップで入れる・外す", async () => { await pickFrom("rem", items, save); draw(); }));
+    table.addRow(uiAction("＋ 自分で入れる", "名前と日付（毎年くり返す日も）", async () => { await addManual(items, save); draw(); }));
+    table.reload();
+  };
+  draw();
+  await table.present(true);
+}
+
+// カレンダー・リマインダーの一覧（月ごとの見出し）。タップで入れる・外す（✓）
+async function pickFrom(src, items, save) {
+  const today = dayStart(new Date(), 0);
+  let list;
+  if (src === "cal") {
+    list = (await calendarEvents(today)).filter(e => e.startDate >= today)
+      .sort((a, b) => a.startDate - b.startDate)
+      .map(e => ({ id: idOf(e), title: clean(e.title), date: dayStart(e.startDate, 0), sub: e.isAllDay ? "終日" : hm(e.startDate), cal: e.calendar ? e.calendar.title : "" }));
+  } else {
+    list = (await dueReminders()).sort((a, b) => a.dueDate - b.dueDate)
+      .map(r => ({ id: idOf(r), title: clean(r.title), date: dayStart(r.dueDate, 0), sub: dayStart(r.dueDate, 0) < today ? "期限切れ" : "", cal: r.calendar ? r.calendar.title : "" }));
+  }
+  const table = new UITable();
+  table.showSeparators = true;
+  const has = it => items.some(x => x.src === src && x.id === it.id && (src === "rem" || x.date === ymd(it.date)));
+  const draw = () => {
+    table.removeAllRows();
+    table.addRow(uiLabel((src === "cal" ? "カレンダーの予定" : "リマインダー") + "　タップで入れる・外す。終わったら閉じる"));
+    if (!list.length) table.addRow(uiLabel(src === "cal" ? "1 年先までの予定がありません（またはカレンダーへのアクセスが許可されていません）" : "期限のある未完了のリマインダーがありません"));
+    let month = "";
+    list.forEach(it => {
+      const m = it.date.getFullYear() + "年" + (it.date.getMonth() + 1) + "月";
+      if (m !== month) {
+        month = m;
+        const h = new UITableRow();
+        h.isHeader = true;
+        h.height = 34;
+        h.addText(m).titleColor = UI.dim;
+        table.addRow(h);
+      }
+      const row = new UITableRow();
+      row.height = 52;
+      row.dismissOnSelect = false;
+      const d = row.addText(md(it.date), WEEK_JA[it.date.getDay()]);
+      d.widthWeight = 16;
+      d.titleFont = Font.mediumMonospacedSystemFont(14);
+      d.subtitleColor = UI.dim;
+      const t = row.addText(it.title, [it.sub, it.cal].filter(Boolean).join("・"));
+      t.widthWeight = 72;
+      t.subtitleColor = UI.dim;
+      const mark = row.addText(has(it) ? "✓" : "");
+      mark.widthWeight = 12;
+      mark.rightAligned();
+      mark.titleColor = UI.accent;
+      mark.titleFont = Font.boldSystemFont(20);
+      row.onSelect = () => {
+        const k = items.findIndex(x => x.src === src && x.id === it.id && (src === "rem" || x.date === ymd(it.date)));
+        if (k >= 0) items.splice(k, 1);
+        else items.push({ title: it.title, src, id: it.id, date: ymd(it.date) });
+        save();
+        draw();
+      };
+      table.addRow(row);
+    });
+    table.reload();
+  };
+  draw();
+  await table.present(true);
+}
+
+async function addManual(items, save) {
+  const title = await askText("名前", "例：期末試験、旅行、誕生日", "");
+  if (!title) return;
+  const k = await sheet("くり返し", ["この日だけ", "毎年（誕生日など）"]);
+  if (k < 0) return;
+  const raw = await askText("日付", k === 0 ? "例：2026-12-24（2026/12/24 や 12/24 でも可。年がなければ次に来るその日）" : "例：03-14（3/14 でも可）", "");
+  if (!raw) return;
+  const date = normalizeDate(raw, k === 1);
+  if (!date) {
+    await notice("日付が読めません", "「2026-12-24」や「12/24」の形で入れてください。");
+    return;
+  }
+  items.push({ title, src: "manual", date });
+  save();
+}
+
+// 「2026/12/24」「12/24」「１２月２４日」→ "2026-12-24" / 毎年なら "12-24"
+function normalizeDate(raw, yearly) {
+  const t = String(raw).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[年月\/.]/g, "-").replace(/日/g, "").trim();
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  let y = null, mo, d;
+  if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else if ((m = t.match(/^(\d{1,2})-(\d{1,2})$/))) { mo = +m[1]; d = +m[2]; }
+  else return null;
+  if (!validDate(y || 2028, mo, d)) return null;
+  if (yearly) return pad2(mo) + "-" + pad2(d);
+  if (y === null) {
+    const now = dayStart(new Date(), 0);
+    y = now.getFullYear();
+    if (new Date(y, mo - 1, d) < now) y++;
+  }
+  return y + "-" + pad2(mo) + "-" + pad2(d);
+}
+
+async function askText(title, message, value) {
+  const a = new Alert();
+  a.title = title;
+  a.message = message;
+  a.addTextField("", value || "");
+  a.addAction("決定");
+  a.addCancelAction("キャンセル");
+  if ((await a.presentAlert()) !== 0) return null;
+  return String(a.textFieldValue(0) || "").trim() || null;
 }
 
 // "YYYY-MM-DD"（その日）/ "MM-DD"（毎年。過ぎていれば来年）
@@ -975,7 +1209,7 @@ async function pickPhoto() {
 // アプリ内プレビュー
 // ============================================================
 async function chooseAction() {
-  const opts = [["小", "small"], ["中", "medium"], ["大", "large"]];
+  const opts = [["カウントダウンを編集", "edit"], ["小", "small"], ["中", "medium"], ["大", "large"]];
   if (Device.isPad()) opts.push(["特大", "extraLarge"]);
   opts.push(["ロック画面（長方形）", "accessoryRectangular"], ["リマインダーから読む", "reminders"], ["透明背景を設定", "setup-clear"]);
   const i = await sheet("プレビュー・設定", opts.map(o => o[0]));
@@ -1001,6 +1235,8 @@ const FROM_SHORTCUT = args.shortcutParameter !== null && args.shortcutParameter 
 const family = FROM_SHORTCUT ? "flagged" : config.widgetFamily || (config.runsInApp ? await chooseAction() : "medium");
 if (family === "flagged") {
   Script.setShortcutOutput("フラグ付き " + saveFlagged(args.shortcutParameter) + " 件を保存しました");
+} else if (family === "edit") {
+  await editItems();
 } else if (family === "reminders") {
   await editReminderSettings();
 } else if (family === "setup-clear") {

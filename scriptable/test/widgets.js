@@ -74,6 +74,37 @@ const CASES = {
   r = await run({ file: 'countdown-widget.js', family: 'large', now: T(0, 10, 30) });
   t = dump(r.w);
   check('COUNTDOWN 大：今月・今週・今日の残り', t.includes('"あと 26日"') && t.includes('"あと 6日"') && t.includes('"あと 13時間"'));
+  // ▶ →「カウントダウンを編集」：カレンダー・リマインダーを一覧からタップで選ぶ／自分で入れる（コードを触らない）
+  {
+    const C = 'countdown-widget.js';
+    const ev = (title, s, cal, id) => ({ title, startDate: s, endDate: new FDate(s.getTime() + 3600000), isAllDay: false, location: '', calendar: { title: cal }, identifier: id });
+    const EVS = [ev('ゼミ発表', T(5, 13), '大学', 'e1'), ev('旅行', T(40, 9), 'プライベート', 'e2')];
+    const RS = [{ title: '書類提出', dueDate: T(9, 9), dueDateIncludesTime: false, isCompleted: false, priority: 0, calendar: { title: 'リマインダー' }, identifier: 'r1' }];
+    const tap = (tb, text) => { const r = tb.find(text); return r.onSelect(tb.rows.indexOf(r)); };
+    const btn = (tb, text, b) => tb.find(text).cells.find(c => c.type === 'button' && c.title === b).onTap();
+    const ed = (ui, o = {}) => run({ file: C, app: true, now: T(0, 10, 30), events: o.events || EVS, reminders: o.rems || RS, sheets: [0].concat(o.sheets || []), texts: o.texts, ui });
+    const large = async (o = {}) => dump((await run({ file: C, family: 'large', now: T(0, 10, 30), events: o.events || EVS, reminders: o.rems || RS })).w);
+    reset();
+    let seen = [];
+    await ed([async tb => { seen = tb.lines(); }]);
+    check('COUNTDOWN 編集：初めて開くと CONFIG の例が一覧に入る', seen.some(l => l.startsWith('冬休み')) && seen.some(l => l.startsWith('誕生日')) && seen.includes('＋ カレンダーの予定から選ぶ'), seen.join(' / '));
+    await ed([async tb => { btn(tb, '冬休み', '✕'); btn(tb, '期末試験', '✕'); btn(tb, '誕生日', '✕'); await tap(tb, '＋ カレンダーの予定から選ぶ'); await tap(tb, '＋ リマインダーから選ぶ'); },
+      async tb => { seen = tb.lines(); await tap(tb, 'ゼミ発表'); }, async tb => { await tap(tb, '書類提出'); }]);
+    let lt = await large();
+    check('COUNTDOWN 編集：カレンダー（月の見出しつき）とリマインダーをタップで選ぶ', seen.includes('2026年10月') && lt.includes('"ゼミ発表"') && lt.includes('"D-5"') && lt.includes('"書類提出"') && !lt.includes('旅行') && !lt.includes('冬休み'), seen.slice(0, 4).join(' / '));
+    lt = await large({ events: [ev('ゼミ発表', T(7, 13), '大学', 'e1')] });
+    check('COUNTDOWN 編集：元の予定の日付を変えると合わせて変わる', lt.includes('"D-7"') && !lt.includes('"D-5"'));
+    lt = await large({ rems: [] });
+    check('COUNTDOWN 編集：リマインダーを完了にすると出ない', !lt.includes('書類提出') && lt.includes('ゼミ発表'));
+    await ed([async tb => { await tap(tb, '＋ 自分で入れる'); }], { sheets: [1], texts: ['記念日', '１２月１日'] });
+    await ed([async tb => { await tap(tb, '＋ 自分で入れる'); }], { sheets: [0], texts: ['文化祭', '10/20'] });
+    await ed([async tb => { await tap(tb, 'ゼミ発表'); }], { texts: ['ゼミ発表（本番）'] });
+    lt = await large();
+    check('COUNTDOWN 編集：自分で入れる（毎年・年なしの日付）と名前の変更', lt.includes('"記念日"') && lt.includes('12.01') && lt.includes('"文化祭"') && lt.includes('10.20') && lt.includes('"ゼミ発表（本番）"'), JSON.stringify(FILES.get('/icloud/countdown/items.json')));
+    await ed([async tb => { await tap(tb, '＋ カレンダーの予定から選ぶ'); }, async tb => { await tap(tb, 'ゼミ発表'); }]);
+    check('COUNTDOWN 編集：もう一度タップで外す', !(await large()).includes('ゼミ発表'));
+    reset();
+  }
   // リマインダーから読む：優先度「高」・リスト・フラグ（ショートカットが名前を渡す）を自分で選ぶ
   const C = 'countdown-widget.js';
   const rem = (title, d, extra = {}) => Object.assign({ title, dueDate: T(d, 9), dueDateIncludesTime: false, isCompleted: false, priority: 0, calendar: { title: 'リマインダー' } }, extra);
@@ -81,14 +112,14 @@ const CASES = {
   const cdTexts = async () => dump((await run({ file: C, family: 'large', now: T(0, 10, 30), reminders: REMS })).w);
   reset();
   check('COUNTDOWN リマインダー：初期はどれも読まない', !(await cdTexts()).includes('レポート提出'));
-  await run({ file: C, app: true, now: T(0, 10, 30), reminders: REMS, sheets: [4, 0, 1, 3], texts: ['カウントダウン'] });
+  await run({ file: C, app: true, now: T(0, 10, 30), reminders: REMS, sheets: [5, 0, 1, 3], texts: ['カウントダウン'] });
   let ct = await cdTexts();
   check('COUNTDOWN リマインダー：優先度「高」とリストを選ぶと出る（期限の日まで）', ct.includes('"レポート提出"') && ct.includes('"英検"') && ct.includes('"D-3"') && !ct.includes('ライブ') && !ct.includes('ふつうの用事'), JSON.stringify(FILES.get('/icloud/countdown/settings.json')));
   r = await run({ file: C, now: T(0, 10, 30), shortcut: ['ライブ', '期限なし'] });
   check('COUNTDOWN フラグ：ショートカットから名前を受け取って保存', r.log.includes('output ' + JSON.stringify('フラグ付き 2 件を保存しました')), r.log.join(' | '));
   ct = await cdTexts();
   check('COUNTDOWN フラグ：オフのうちは出さない', !ct.includes('"ライブ"'));
-  await run({ file: C, app: true, now: T(0, 10, 30), reminders: REMS, sheets: [4, 0, 2, 3] });
+  await run({ file: C, app: true, now: T(0, 10, 30), reminders: REMS, sheets: [5, 0, 2, 3] });
   ct = await cdTexts();
   check('COUNTDOWN フラグ：オンにすると出る（優先度はオフに戻した）', ct.includes('"ライブ"') && ct.includes('"英検"') && !ct.includes('"レポート提出"') && !ct.includes('期限なし'));
   reset();
