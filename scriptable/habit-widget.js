@@ -19,6 +19,11 @@
      Scriptable で ▶ →「習慣を編集」。一覧は iCloud（habit/habits.json）に
      保存され、iPhone と iPad で共有されます。名前を変えても記録は引き継ぎます。
 
+   中サイズに出す習慣（最大 4 個）
+     Scriptable で ▶ →「中サイズに出す習慣を選ぶ」→ タップで ✓（選んだ順に上から）
+     → 「保存して閉じる」。選んだ数で縦に等分し、行のどこをタップしても記録できます。
+     選んでいなければ一覧の上から 4 個。Parameter に習慣名を書くとそちらが優先です。
+
    対応サイズ
      ホーム画面：小 / 中 / 大 / 特大（iPad）
      ロック画面：長方形 / 円形 / インライン
@@ -171,44 +176,47 @@ function buildSmall(w, D) {
 }
 
 // ---------- 中：習慣ごとに 1 行（名前・直近 7 日・連続日数） ----------
+// ---------- 中：選んだ習慣（最大 4 個）を縦に等分。行全体がタップで記録（2026-10-25 ユーザー依頼） ----------
+// 見出しは置かず、行の高さを最大に。行と行の間に罫線。赤い輪はこの中で今日まだの上の 1 つ
 function buildMedium(w, D) {
-  w.setPadding(12, 13, 11, 13);
-  const budget = ROOMY ? 130 : 122;
+  w.setPadding(4, 13, 4, 13);
+  const list = mediumHabits(D);
+  if (!list.length) {
+    w.addSpacer();
+    addNote(w, "習慣がありません（▶ →「習慣を編集」で追加）", 0, sys(12), P.dim);
+    w.addSpacer();
+    return;
+  }
+  const next = list.find(h => !h.done);
   const pitch = 13, streakW = 40, gap = 8;
-
-  const hd = hstack(w);
-  hd.centerAlignContent();
-  addText(hd, "HABIT", mono(10, "semibold"), P.ink);
-  hd.addSpacer(8);
-  addText(hd, md(D.now) + " " + WEEK[D.now.getDay()], mono(10), P.dim);
-  hd.addSpacer();
-  addText(hd, D.doneCount + "/" + D.habits.length + " DONE", mono(10), P.faint);
-  w.addSpacer(6);
-
-  const lt = hstack(w);
-  lt.addSpacer();
-  addWeekLetters(lt, D.now, 7, pitch, 9);
-  const pad = lt.addStack();   // 連続日数の列のぶん空ける
-  pad.size = new Size(gap + streakW, 0);
-  w.addSpacer(3);
-
-  const head = 10 * 1.22 + 6 + 9 * 1.22 + 3;
-  const rowH = 13 * 1.32;
-  const fit = fitCount(D.habits.length, budget - head, rowH, GAP);
-  const box = vstack(w);
-  box.spacing = GAP;
-  D.habits.slice(0, fit.shown).forEach(h => {
-    const row = hstack(box);
+  list.forEach((h0, i) => {
+    const h = Object.assign({}, h0, { hl: h0 === next });
+    if (i) addRule(w);
+    const band = vstack(w);          // 行の帯（等分）。帯ごとにタップ先
+    band.url = recordUrl(h.name);
+    band.addSpacer();
+    const row = hstack(band);
     row.centerAlignContent();
-    row.url = recordUrl(h.name);
-    addText(row, h.name, sys(13, "medium"), P.ink);
+    const name = addText(row, h.name, sys(13, "medium"), P.ink);
+    name.lineLimit = 1;
+    name.minimumScaleFactor = 0.8;
     row.addSpacer();
     addDotRow(row, dayStates(h, D.now, 7), pitch);
     row.addSpacer(gap);
     addStreak(row, h, mono(11.5, "semibold"), streakW);
+    band.addSpacer();
   });
-  if (fit.more) addNote(box, "+" + fit.more + "件", 0, mono(10, "medium"), P.faint);
-  w.addSpacer();
+}
+
+// 中に出す習慣：Parameter で名前を指定していればそれ、なければ ▶ で選んだもの（habit/medium.json）、どちらも無ければ上から。最大 4 個
+const MEDIUM_MAX = 4;
+function mediumHabits(D) {
+  let list = D.habits;
+  if (!PICK.length && D.mediumPick.length) {
+    const picked = D.mediumPick.map(n => D.habits.find(h => h.name === n)).filter(Boolean);
+    if (picked.length) list = picked;
+  }
+  return list.slice(0, MEDIUM_MAX);
 }
 
 // ---------- 大：習慣ごとに 2 行（名前・連続日数／直近 28 日） ----------
@@ -401,7 +409,7 @@ async function loadData() {
   });
   const next = habits.find(h => !h.done);
   if (next) next.hl = true;   // まだの習慣のうち、上の 1 つだけ赤
-  return { now, habits, doneCount: habits.filter(h => h.done).length };
+  return { now, habits, doneCount: habits.filter(h => h.done).length, mediumPick: await loadMediumPick() };
 }
 
 // 連続日数：今日が済んでいれば今日から、まだなら昨日から数える
@@ -455,6 +463,49 @@ async function loadHabitList() {
   } catch (e) {
     return CONFIG.habits.slice();
   }
+}
+
+// 中サイズに出す習慣（▶ →「中サイズに出す習慣を選ぶ」）
+function mediumPath(fm) {
+  return fm.joinPath(fm.joinPath(fm.documentsDirectory(), DIR), "medium.json");
+}
+
+async function loadMediumPick() {
+  const fm = store();
+  const p = mediumPath(fm);
+  if (!fm.fileExists(p)) return [];
+  try {
+    await fm.downloadFileFromiCloud(p);
+    const list = JSON.parse(fm.readString(p));
+    return Array.isArray(list) ? list.map(String) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveMediumPick(list) {
+  const fm = store();
+  const dir = fm.joinPath(fm.documentsDirectory(), DIR);
+  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+  fm.writeString(mediumPath(fm), JSON.stringify(list));
+}
+
+// タップで ✓ を付け外し（最大 4 個・選んだ順に上から並ぶ）→「保存して閉じる」
+async function pickMediumMenu() {
+  const all = await loadHabitList();
+  let pick = (await loadMediumPick()).filter(n => all.includes(n));
+  for (;;) {
+    const labels = all.map(n => (pick.includes(n) ? "✓ " + (pick.indexOf(n) + 1) + "  " : "　 ") + n);
+    const k = await sheet("中サイズに出す習慣（最大 " + MEDIUM_MAX + " 個・選んだ順に上から）", labels.concat(["保存して閉じる", "選択を外す（上から " + MEDIUM_MAX + " 個）"]));
+    if (k < 0) return;
+    if (k === all.length) break;
+    if (k === all.length + 1) { pick = []; break; }
+    const n = all[k];
+    if (pick.includes(n)) pick = pick.filter(x => x !== n);
+    else if (pick.length >= MEDIUM_MAX) await notice("最大 " + MEDIUM_MAX + " 個です", "ほかの習慣の ✓ を外してから選んでください。");
+    else pick.push(n);
+  }
+  saveMediumPick(pick);
 }
 
 function saveHabitList(list) {
@@ -961,7 +1012,7 @@ async function pickPhoto() {
 // アプリ内プレビュー
 // ============================================================
 async function chooseAction() {
-  const opts = [["今日の記録をつける", "record"], ["過去 7 日の記録を直す", "fix"], ["習慣を編集", "edit"], ["小", "small"], ["中", "medium"], ["大", "large"]];
+  const opts = [["今日の記録をつける", "record"], ["過去 7 日の記録を直す", "fix"], ["習慣を編集", "edit"], ["中サイズに出す習慣を選ぶ", "pick-medium"], ["小", "small"], ["中", "medium"], ["大", "large"]];
   if (Device.isPad()) opts.push(["特大", "extraLarge"]);
   opts.push(["ロック画面（長方形）", "accessoryRectangular"], ["透明背景を設定", "setup-clear"]);
   const i = await sheet("プレビュー・設定", opts.map(o => o[0]));
@@ -994,6 +1045,8 @@ if (LINK) {
   await fixMenu();
 } else if (family === "edit") {
   await editMenu();
+} else if (family === "pick-medium") {
+  await pickMediumMenu();
 } else if (family === "setup-clear") {
   await setupClear();
 } else if (family) {

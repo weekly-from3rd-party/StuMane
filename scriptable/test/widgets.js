@@ -146,9 +146,10 @@ const CASES = {
   r = await run({ file: 'habit-widget.js', family: 'medium', now: T(0, 10, 30), scriptName: '習慣' });
   t = dump(r.w);
   check('HABIT 連続日数（今日済み 5 日 / 今日まだでも昨日まで 3 日 / 途切れ 0 日）', /筋トレ[\s\S]*?"5日"[\s\S]*?読書[\s\S]*?"3日"[\s\S]*?勉強[\s\S]*?"0日"/.test(t));
-  check('HABIT 完了数 1/3', t.includes('"1/3 DONE"'));
-  const rows = r.w.children.find(c => c.dir === 'v' && c.children.some(x => x.url));
-  check('HABIT 行のタップで記録用の URL', rows && rows.children[1].url === 'scriptable:///run?scriptName=%E7%BF%92%E6%85%A3&habit=%E8%AA%AD%E6%9B%B8', rows && rows.children[1].url);
+  check('HABIT 完了数 1/3（大の見出し）', dump((await run({ file: 'habit-widget.js', family: 'large', now: T(0, 10, 30) })).w).includes('"1/3 DONE"'));
+  const bands = r.w.children.filter(c => c.url);
+  check('HABIT 中：習慣ごとの帯が縦に等分（帯全体がタップで記録・間に罫線）', bands.length === 3 && bands[1].url === 'scriptable:///run?scriptName=%E7%BF%92%E6%85%A3&habit=%E8%AA%AD%E6%9B%B8'
+    && r.w.children.filter(c => !c.url && c.backgroundColor).length === 2 && !t.includes('DONE'), bands.map(b => b.url).join(' '));
   // タップ → 記録 → 反映
   r = await run({ file: 'habit-widget.js', app: true, now: T(0, 21), query: { habit: '読書' } });
   check('HABIT タップで今日を記録（連続 4 日）', r.log.some(l => l.includes('✓ 読書') && l.includes('連続 4 日')), r.log.join(' | '));
@@ -181,6 +182,21 @@ const CASES = {
   check('HABIT 編集後の習慣もタップで記録できる', !r.log.some(l => l.includes('見つかりません')), r.log.join(' | '));
   r = await run({ file: 'habit-widget.js', app: true, now: T(0, 12), query: { habit: '読書' } });
   check('HABIT 一覧に無い名前のタップは案内を出す', r.log.some(l => l.includes('習慣が見つかりません')));
+
+  // 中サイズに出す習慣を選ぶ（最大 4 個・選んだ順）
+  {
+    const H = 'habit-widget.js';
+    FILES.set('/icloud/habit/habits.json', JSON.stringify(['A', 'B', 'C', 'D', 'E', 'F']));
+    const medNames = async (param) => (await run({ file: H, family: 'medium', now: T(0, 12), param })).w.children.filter(c => c.url).map(c => decodeURIComponent(c.url.split('habit=')[1]));
+    check('HABIT 中：選んでいなければ上から 4 個', (await medNames()).join('') === 'ABCD', (await medNames()).join(''));
+    r = await run({ file: H, app: true, now: T(0, 12), sheets: [3, 4, 1, 5, 0, 2, 6], alerts: [0] });
+    check('HABIT 中：▶ で選んだ順に出す（5 個目は断る）', (await medNames()).join('') === 'EBFA' && r.log.some(l => l.includes('最大 4 個')), (await medNames()).join(''));
+    check('HABIT 中：Parameter の指定が優先', (await medNames('C,D')).join('') === 'CD');
+    await run({ file: H, app: true, now: T(0, 12), sheets: [3, 7] });
+    check('HABIT 中：選択を外すと上から 4 個に戻る', (await medNames()).join('') === 'ABCD');
+    FILES.delete('/icloud/habit/habits.json');
+    FILES.delete('/icloud/habit/medium.json');
+  }
 
   seedHabit(null);
   r = await run({ file: 'habit-widget.js', family: 'small', now: T(0, 10) });
