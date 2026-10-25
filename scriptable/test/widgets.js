@@ -421,14 +421,19 @@ const CASES = {
   check('LAUNCHER 初期の選択肢に戻す（セットの中のアプリも入れる）', !cat().some(x => x.cat === 'ゲーム') && ['foo://', 'bar://', 'baz://'].every(u => (inCat(u) || {}).cat === '自分で追加'),
     JSON.stringify(cat().map(g => g.cat + g.items.length)));
   // ショートカット名の置き換え（日本語名 → ユーザーが作った「アプリを開く N」）。保存済みのセット・選択肢も読むときに直す
-  const oldSafari = 'shortcuts://run-shortcut?name=MUJI', newSafari = 'shortcuts://run-shortcut?name=' + encodeURIComponent('アプリを開く 39');
-  FILES.set('/icloud/launcher/sets.json', JSON.stringify([{ name: '朝', apps: [{ label: 'MUJI', icon: 'house', url: oldSafari }, { label: 'SAFARI', icon: 'safari', url: 'shortcuts://run-shortcut?name=' + encodeURIComponent('アプリを開く 2') }, { label: 'CALC', icon: 'x', url: 'shortcuts://run-shortcut?name=' + encodeURIComponent('計算機') }] }]));
-  FILES.set('/icloud/launcher/catalog.json', JSON.stringify({ groups: [{ cat: 'Apple のアプリ', items: [{ name: 'MUJI', label: 'MUJI', icon: 'house', url: oldSafari }] }], known: [oldSafari] }));
+  const oldSafari = 'shortcuts://run-shortcut?name=' + encodeURIComponent('Nothing X'), newSafari = 'shortcuts://run-shortcut?name=' + encodeURIComponent('アプリを開く 41');
+  FILES.set('/icloud/launcher/sets.json', JSON.stringify([{ name: '朝', apps: [{ label: 'NTHX', icon: 'headphones', url: oldSafari }, { label: 'SAFARI', icon: 'safari', url: 'shortcuts://run-shortcut?name=' + encodeURIComponent('アプリを開く 2') }, { label: 'CALC', icon: 'x', url: 'shortcuts://run-shortcut?name=' + encodeURIComponent('計算機') }] }]));
+  FILES.set('/icloud/launcher/catalog.json', JSON.stringify({ groups: [{ cat: 'Apple のアプリ', items: [{ name: 'Nothing X', label: 'NTHX', icon: 'headphones', url: oldSafari }] }], known: [oldSafari] }));
   r = await run({ file: L, family: 'medium', now: T(1, 10), param: '朝' });
   check('LAUNCHER 保存済みのセットの開く先を、作ったショートカットの名前・直接開く URL に置き換える', urls(r.w).join(' ') === [newSafari, 'x-safari-https://www.google.com', 'calc://'].join(' ') && setUrls() === urls(r.w).join(' '), urls(r.w).join(' '));
   await edit([async tb => { await tap(tb, '＋ アプリを追加'); }]);
   check('LAUNCHER 保存済みの選択肢も置き換え、二重にならない', cat().flatMap(g => g.items).filter(x => x.url === newSafari).length === 1 && !JSON.stringify(cat()).includes(oldSafari)
     && (inCat('abceed://') || {}).cat === '勉強・仕事' && !inCat('shortcuts://run-shortcut?name=' + encodeURIComponent('アプリを開く 2')));
+  // 2026-10-25 Safari で開くのを確かめたアプリ：ショートカット経由の保存済みセットを URL 直接に
+  const scu = n => 'shortcuts://run-shortcut?name=' + encodeURIComponent(n);
+  FILES.set('/icloud/launcher/sets.json', JSON.stringify([{ name: '朝', apps: [['MUJI', 'アプリを開く 39'], ['RKTNPAY', 'アプリを開く 84'], ['PHONE', 'アプリを開く 107'], ['REMOTE', 'リモコン'], ['ICLOUD', 'iCloud Drive']].map(([label, n]) => ({ label, icon: 'x', url: scu(n) })) }]));
+  r = await run({ file: L, family: 'medium', now: T(1, 10), param: '朝' });
+  check('LAUNCHER MUJI・楽天ペイ・電話・リモコン・iCloud Drive は URL で直接開く', urls(r.w).join(' ') === 'mujipassport:// rakutenpay:// mobilephone:// tvremote:// shareddocuments://', urls(r.w).join(' '));
   // setlog：スクリプトに入れた白黒の画像を初期のアイコンに。保存済みのセットにも入れ、線画に戻したら入れ直さない
   const SETLOG = 'shortcuts://run-shortcut?name=' + encodeURIComponent('アプリを開く 23');
   FILES.set('/icloud/launcher/sets.json', JSON.stringify([{ name: '朝', apps: [{ label: 'SETLOG', icon: 'list.bullet', url: SETLOG }, { label: 'NOTION', icon: 'doc.text', url: 'notion://' }] }]));

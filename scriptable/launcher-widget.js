@@ -303,7 +303,8 @@ const sc = (label, icon, name, shortcut) => {
   if (shortcut && shortcut !== name) RENAMED[shortcutUrl(name)] = shortcutUrl(shortcut);
   return { label, icon, url: shortcutUrl(shortcut || name), name };
 };
-// moved(表示名, アイコン, URL, 日本語名, 前のショートカット名)＝前はショートカット経由で、URL で直接開くようにしたもの（2026-10-06・URL は推測で実機未確認）
+// moved(表示名, アイコン, URL, 日本語名, 前のショートカット名)＝前はショートカット経由で、URL で直接開くようにしたもの（2026-10-06・URL は推測で実機未確認。
+// 電話・リモコン・iCloud Drive・MUJI・楽天ペイは 2026-10-25 に Safari で開くのを確認）
 const moved = (label, icon, url, name, was) => {
   [name, was].filter(Boolean).forEach(n => { RENAMED[shortcutUrl(n)] = url; });
   return u(label, icon, url, name);
@@ -332,7 +333,7 @@ const DEFAULT_GROUPS = [
     moved("SAFARI", "safari", "x-safari-https://www.google.com", "Safari", "アプリを開く 2"),
     sc("CAM", "camera", "カメラ", "アプリを開く 68"),
     sc("FT", "video", "FaceTime", "アプリを開く 32"),
-    sc("PHONE", "phone", "電話", "アプリを開く 107"),
+    moved("PHONE", "phone", "mobilephone://", "電話", "アプリを開く 107"),
     moved("PEOPLE", "person.crop.circle", "contacts://", "連絡先"),
     moved("CALC", "plus.forwardslash.minus", "calc://", "計算機", "アプリを開く 103"),
     sc("PASS", "key", "パスワード", "アプリを開く 59"),
@@ -344,8 +345,8 @@ const DEFAULT_GROUPS = [
     moved("MOVIE", "film", "imovie://", "iMovie"),
     moved("CLIPS", "video.badge.plus", "clips://", "Clips"),
     sc("GAMES", "gamecontroller", "ゲーム"),
-    sc("REMOTE", "tv", "リモコン"),
-    sc("ICLOUD", "icloud", "iCloud Drive"),
+    moved("REMOTE", "tv", "tvremote://", "リモコン"),
+    moved("ICLOUD", "icloud", "shareddocuments://", "iCloud Drive"),
     sc("VISION", "visionpro", "Apple Vision Pro の設定")]],
   ["勉強・仕事", [["NOTION", "Notion"], ["CLAUDE", "Claude"], ["STUDY", "STUDYMANAGER"], ["NOTES", "GoodNotes"],
     u("GMAIL", "tray", "googlegmail://", "Gmail"),
@@ -394,7 +395,8 @@ const DEFAULT_GROUPS = [
     u("AMZN", "cart", "com.amazon.mobile.shopping://", "Amazon"),
     moved("RKTN", "bag", "rakutenichiba://", "楽天市場", "アプリを開く 102"),
     moved("ZOZO", "tshirt", "zozotown://", "ZOZOTOWN", "アプリを開く 56"),
-    sc("MUJI", "house", "MUJI", "アプリを開く 39"),
+    moved("MUJI", "house", "mujipassport://", "MUJI", "アプリを開く 39"),
+    moved("RKTNPAY", "creditcard", "rakutenpay://", "楽天ペイ", "アプリを開く 84"),
     moved("HPB", "scissors", "hotpepperbeauty://", "ホットペッパー", "アプリを開く 95"),
     sc("MIZUHO", "building.columns", "みずほ銀行", "アプリを開く 82"),
     sc("YUCHO", "yensign.circle", "ゆうちょ通帳", "アプリを開く 83"),
