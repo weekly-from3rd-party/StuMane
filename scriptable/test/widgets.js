@@ -189,11 +189,23 @@ const CASES = {
     FILES.set('/icloud/habit/habits.json', JSON.stringify(['A', 'B', 'C', 'D', 'E', 'F']));
     const medNames = async (param) => (await run({ file: H, family: 'medium', now: T(0, 12), param })).w.children.filter(c => c.url).map(c => decodeURIComponent(c.url.split('habit=')[1]));
     check('HABIT 中：選んでいなければ上から 4 個', (await medNames()).join('') === 'ABCD', (await medNames()).join(''));
-    r = await run({ file: H, app: true, now: T(0, 12), sheets: [3, 4, 1, 5, 0, 2, 6], alerts: [0] });
+    r = await run({ file: H, app: true, now: T(0, 12), sheets: [3, 0, 4, 1, 5, 0, 2, 6], alerts: [0] });
     check('HABIT 中：▶ で選んだ順に出す（5 個目は断る）', (await medNames()).join('') === 'EBFA' && r.log.some(l => l.includes('最大 4 個')), (await medNames()).join(''));
     check('HABIT 中：Parameter の指定が優先', (await medNames('C,D')).join('') === 'CD');
-    await run({ file: H, app: true, now: T(0, 12), sheets: [3, 7] });
+    await run({ file: H, app: true, now: T(0, 12), sheets: [3, 0, 7] });
     check('HABIT 中：選択を外すと上から 4 個に戻る', (await medNames()).join('') === 'ABCD');
+    // 大（最大 6 個）・特大（最大 12 個・2 列）も同じく選んだ習慣を等分の帯に
+    const bandNames = n => (n.children || []).flatMap(c => c.url && c.url.includes('habit=') ? [decodeURIComponent(c.url.split('habit=')[1])] : bandNames(c));
+    const lgNames = async (family) => bandNames((await run({ file: H, family, now: T(0, 12) })).w);
+    check('HABIT 大：選んでいなければ上から 6 個（帯ごとにタップで記録）', (await lgNames('large')).join('') === 'ABCDEF', (await lgNames('large')).join(''));
+    await run({ file: H, app: true, now: T(0, 12), sheets: [3, 1, 2, 0, 6] });
+    check('HABIT 大：▶ で選んだ習慣だけ選んだ順に', (await lgNames('large')).join('') === 'CA', (await lgNames('large')).join(''));
+    check('HABIT 大の選択は中に影響しない', (await medNames()).join('') === 'ABCD', (await medNames()).join(''));
+    FILES.set('/icloud/habit/extraLarge.json', JSON.stringify(['F', 'E', 'D']));
+    r = await run({ file: H, family: 'extraLarge', now: T(0, 12) });
+    check('HABIT 特大：選んだ習慣を 2 列に（左 2・右 1＋空の帯で高さを揃える）', bandNames(r.w).join('') === 'FED', bandNames(r.w).join(''));
+    FILES.delete('/icloud/habit/large.json');
+    FILES.delete('/icloud/habit/extraLarge.json');
     FILES.delete('/icloud/habit/habits.json');
     FILES.delete('/icloud/habit/medium.json');
   }
