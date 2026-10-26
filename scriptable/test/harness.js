@@ -66,7 +66,7 @@ const fmOf = root => ({ documentsDirectory: () => root, joinPath: (a, b) => a.re
   writeString: (p, v) => { if (typeof v !== 'string') throw new TypeError('writeString'); if (!DIRS.has(p.slice(0, p.lastIndexOf('/')))) throw new Error('no dir'); FILES.set(p, v); },
   downloadFileFromiCloud: p => { if (typeof p !== 'string') throw new TypeError('download'); return Promise.resolve(); } });
 const FileManager = { local: () => fmOf('/docs'), iCloud: () => fmOf('/icloud') };
-const reset = () => { FILES.clear(); DIRS.clear(); };
+const reset = () => { FILES.clear(); DIRS.clear(); PENDING.clear(); };
 const REG = new Map(); let RID = 0;
 const Data = { fromBase64String: s => { if (typeof s !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(s)) throw new TypeError('fromBase64String'); return { __b64: s }; }, fromPNG: img => { if (!img || !img.__img) throw new TypeError('fromPNG'); const id = 'SYN' + (++RID); REG.set(id, img); return { toBase64String: () => id }; } };
 class WebView {
@@ -111,6 +111,14 @@ function dump(n, ind = '') {
   let s = ind + (n.kind === 'widget' ? 'WIDGET' : n.dir === 'h' ? 'H' : 'V') + (n.size ? ` ${n.size.width}x${n.size.height}` : '') + (n.backgroundColor && n.kind !== 'widget' && n.cornerRadius ? ' bg' + n.backgroundColor : '') + (n.url ? ' → ' + n.url : '') + '\n';
   n.children.forEach(c => s += dump(c, ind + '  ')); return s;
 }
+// 通知：予約中（PENDING、run をまたいで残る）。トリガーなしの schedule() はすぐ届いたものとして log に「notify 題｜本文」
+const PENDING = new Map();
+class Notification {
+  constructor() { this.identifier = ''; this.title = ''; this.body = ''; this.threadIdentifier = ''; this.openURL = ''; this.sound = null; this.trigger = null; }
+  setTriggerDate(d) { if (!(d instanceof Date)) throw new TypeError('setTriggerDate'); this.trigger = new Date(d.getTime()); }
+  static async allPending() { return [...PENDING.values()]; }
+  static async removePending(ids) { if (!Array.isArray(ids)) throw new TypeError('removePending'); ids.forEach(i => PENDING.delete(i)); }
+}
 async function run(o) {
   FIXED = o.now.getTime(); let setW = null, made = null; const log = [];
   const sheets = (o.sheets || []).slice(), alerts = (o.alerts || []).slice(), photos = (o.photos || []).slice();
@@ -140,7 +148,10 @@ async function run(o) {
   // WebView を表示したとき：o.web(html) が返すものをページの window とする（ページでの操作の結果を模擬）
   class WV extends WebView { async present(full) { if (full !== undefined && typeof full !== 'boolean') throw new TypeError('present'); if (!this.ok) throw new Error('present before load'); log.push('webview'); this.win = o.web ? o.web(this.html) : {}; } }
   const scr = o.pad ? [834, 1194] : (o.screen || [393, 852]);
-  const ctx = vm.createContext({ Date: FDate, Color, Size, Rect, Point, Font, DrawContext, ListWidget, Alert, FileManager, Data, WebView: WV, Image: { fromData: d => { if (!d || !d.__b64) throw new TypeError('Image.fromData'); return { __img: true, size: new Size(180, 180), name: 'b64' }; } }, console, Reminder, Calendar, SFSymbol,
+  class Note extends Notification { async schedule() { for (const k of ['identifier', 'title', 'body', 'threadIdentifier', 'openURL']) if (typeof this[k] !== 'string') throw new TypeError('Notification.' + k);
+    if (this.openURL && !okUrl(this.openURL)) throw new TypeError('openURL ' + this.openURL);
+    if (this.trigger) PENDING.set(this.identifier || String(PENDING.size), this); else log.push('notify ' + this.title + '｜' + this.body); } }
+  const ctx = vm.createContext({ Notification: Note, Date: FDate, Color, Size, Rect, Point, Font, DrawContext, ListWidget, Alert, FileManager, Data, WebView: WV, Image: { fromData: d => { if (!d || !d.__b64) throw new TypeError('Image.fromData'); return { __img: true, size: new Size(180, 180), name: 'b64' }; } }, console, Reminder, Calendar, SFSymbol,
     UITable, UITableRow, UITableCell,
     Safari: { open: u => { if (!okUrl(u)) throw new TypeError('Safari.open ' + u); log.push('open ' + u); } },
     URLScheme: { forRunningScript: () => 'scriptable:///run?scriptName=' + encodeURIComponent(o.scriptName || 'Widget') },
@@ -190,4 +201,4 @@ function ascii(img, cell) {
     if (g[y] && x < W && x >= 0) g[y][x] = c.alpha > 0.5 ? '#' : (g[y][x] === '#' ? '#' : '.'); });
   return g.map(row => row.join('')).join('\n');
 }
-module.exports = { ascii, run, dump, FDate, shot, FILES, reset, H, W, DEV, timerText };
+module.exports = { ascii, run, dump, FDate, shot, FILES, PENDING, reset, H, W, DEV, timerText };

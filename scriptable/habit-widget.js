@@ -24,6 +24,14 @@
      → 「保存して閉じる」。選んだ数で縦に等分し、帯のどこをタップしても記録できます。
      選んでいなければ一覧の上から。Parameter に習慣名を書くとそちらが優先です。
 
+   通知（習慣ごとに時刻を決めて鳴らす）
+     Scriptable で ▶ →「習慣を編集」→「通知を設定する」→ 習慣 → 時刻 → 方式
+       ・Scriptable の予約：設定はここだけ。記録済みの日でも、しばらく
+         ウィジェットや Scriptable が動いていないと鳴ることがある
+       ・ショートカットのオートメーション：記録済みの日は鳴らない。
+         時刻ごとにオートメーションを作る（手順は HABIT-NOTIFY.md）
+     通知をタップすると、その習慣の今日の記録がつきます。
+
    対応サイズ
      ホーム画面：小 / 中 / 大 / 特大（iPad）
      ロック画面：長方形 / 円形 / インライン
@@ -602,9 +610,10 @@ async function fixMenu() {
 // ▶ メニューから：習慣の追加・名前の変更・並べ替え・削除
 async function editMenu() {
   const list = await loadHabitList();
-  const i = await sheet("習慣を編集（いま " + list.length + " 個）", ["追加する", "名前を変える", "並べ替える", "削除する"]);
+  const i = await sheet("習慣を編集（いま " + list.length + " 個）", ["追加する", "名前を変える", "並べ替える", "削除する", "通知を設定する"]);
   if (i === 0) return addHabit(list);
   if (i < 0 || !list.length) return;
+  if (i === 4) return notifyMenu(list);
   const j = await sheet(["", "名前を変える習慣", "動かす習慣", "削除する習慣"][i], list);
   if (j < 0) return;
   if (i === 1) return renameHabit(list, j);
@@ -650,6 +659,12 @@ async function renameHabit(list, j) {
     delete rec[old];
     saveRecords(rec);
   }
+  const ns = await loadNotify();
+  if (ns[old]) {
+    ns[name] = ns[old];
+    delete ns[old];
+    saveNotify(ns);
+  }
   list[j] = name;
   saveHabitList(list);
   await notice("名前を変えました", "「" + old + "」→「" + name + "」。記録は引き継いでいます。");
@@ -676,7 +691,140 @@ async function deleteHabit(list, j) {
   if ((await a.presentAlert()) !== 0) return;
   list.splice(j, 1);
   saveHabitList(list);
+  const ns = await loadNotify();
+  if (ns[name]) {
+    delete ns[name];
+    saveNotify(ns);
+  }
   await notice("削除しました", "「" + name + "」を一覧から外しました。");
+}
+
+// ============================================================
+// 通知（habit/notify.json = { 習慣名: { time: "22:00", mode: "app" | "auto" } }）
+//   app ：Scriptable が 7 日先まで予約する。動くたびに組み直し、今日済みなら今日の分を外す
+//   auto：ショートカットのオートメーションがその時刻に Run Script（Parameter に習慣名）→ まだなら今すぐ通知
+// ============================================================
+const NOTIFY_ID = "habit-notify:";
+const NOTIFY_DAYS = 7;
+
+function notifyPath(fm) {
+  return fm.joinPath(fm.joinPath(fm.documentsDirectory(), DIR), "notify.json");
+}
+
+async function loadNotify() {
+  const fm = store();
+  const p = notifyPath(fm);
+  if (!fm.fileExists(p)) return {};
+  try {
+    await fm.downloadFileFromiCloud(p);
+    const ns = JSON.parse(fm.readString(p));
+    return ns && typeof ns === "object" && !Array.isArray(ns) ? ns : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveNotify(ns) {
+  const fm = store();
+  const dir = fm.joinPath(fm.documentsDirectory(), DIR);
+  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+  fm.writeString(notifyPath(fm), JSON.stringify(ns));
+}
+
+// 「22:00」「22時」「7:5」「２２：３０」→ "22:00" など。読めなければ null
+function parseTime(text) {
+  const t = String(text || "").replace(/[０-９：]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).trim();
+  const m = t.match(/^(\d{1,2})\s*(?:[:時]\s*(\d{1,2})?\s*分?)?$/);
+  if (!m) return null;
+  const h = Number(m[1]), mi = Number(m[2] || 0);
+  return h < 24 && mi < 60 ? pad2(h) + ":" + pad2(mi) : null;
+}
+
+function notifyLabel(n) {
+  return n ? n.time + (n.mode === "auto" ? "（オートメーション）" : "（予約）") : "なし";
+}
+
+async function notifyMenu(list) {
+  const ns = await loadNotify();
+  const j = await sheet("通知を設定する習慣", list.map(n => n + "　" + notifyLabel(ns[n])));
+  if (j < 0) return;
+  const name = list[j];
+  const a = new Alert();
+  a.title = name + "：通知の時刻";
+  a.message = "例：22:00（空にすると通知を外します）";
+  a.addTextField("22:00", ns[name] ? ns[name].time : "");
+  a.addAction("決定");
+  a.addCancelAction("キャンセル");
+  if ((await a.presentAlert()) !== 0) return;
+  const raw = String(a.textFieldValue(0) || "").trim();
+  if (!raw) {
+    delete ns[name];
+    saveNotify(ns);
+    return notice("通知を外しました", "「" + name + "」の通知はもう鳴りません。オートメーションを作っていたら、ショートカットアプリで消してください。");
+  }
+  const time = parseTime(raw);
+  if (!time) return notice("時刻を読めません", "「" + raw + "」→ 22:00 のように入れてください。");
+  const k = await sheet(name + " " + time + "：通知の方式", ["Scriptable の予約（設定はここだけ・記録済みでも鳴ることがある）", "ショートカットのオートメーション（記録済みなら鳴らない）"]);
+  if (k < 0) return;
+  ns[name] = { time, mode: k === 1 ? "auto" : "app" };
+  saveNotify(ns);
+  if (k === 1) {
+    await notice("オートメーションを作ってください", "ショートカット → オートメーション → ＋ →「時刻」" + time + "・毎日・すぐに実行 →「Run Script」でこのスクリプトを選び、Parameter に「" + name + "」と入れる。\n詳しくは HABIT-NOTIFY.md。");
+  } else {
+    await notice("通知を設定しました", "毎日 " + time + " に「" + name + "」の通知が鳴ります（今日済みなら今日は鳴りません）。");
+  }
+}
+
+// 予約の組み直し（app の習慣だけ）。このスクリプトが動くたびに呼ぶ
+async function syncNotifications() {
+  try {
+    const ns = await loadNotify();
+    const names = await loadHabitList();
+    const rec = await loadRecords();
+    const old = (await Notification.allPending()).map(n => n.identifier).filter(id => id.indexOf(NOTIFY_ID) === 0);
+    if (old.length) await Notification.removePending(old);
+    const now = new Date();
+    for (const name of names) {
+      const n = ns[name];
+      if (!n || n.mode !== "app" || !parseTime(n.time)) continue;
+      const [h, m] = n.time.split(":").map(Number);
+      const done = new Set(rec[name] || []);
+      for (let k = 0; k < NOTIFY_DAYS; k++) {
+        const d = dayStart(now, k);
+        d.setHours(h, m, 0, 0);
+        if (d <= now || done.has(ymd(d))) continue;
+        const note = habitNote(name);
+        note.identifier = NOTIFY_ID + name + ":" + ymd(d);
+        note.setTriggerDate(d);
+        await note.schedule();
+      }
+    }
+  } catch (e) {
+    // 通知が使えなくてもウィジェットは描く
+  }
+}
+
+function habitNote(name) {
+  const note = new Notification();
+  note.title = name;
+  note.body = "今日はまだ記録がありません（タップで記録）";
+  note.threadIdentifier = "habit";
+  note.openURL = recordUrl(name);
+  return note;
+}
+
+// オートメーションから：Parameter の習慣（カンマ区切りで複数可）のうち、今日まだのものを今すぐ通知
+async function notifyNow(param) {
+  const names = await loadHabitList();
+  const rec = await loadRecords();
+  const today = ymd(new Date());
+  const out = [];
+  for (const name of String(param).split(/[,、\n]/).map(x => x.trim()).filter(Boolean)) {
+    if (!names.includes(name) || (rec[name] || []).includes(today)) continue;
+    await habitNote(name).schedule();
+    out.push(name);
+  }
+  return out;
 }
 
 // ============================================================
@@ -1036,8 +1184,11 @@ async function preview(w, family) {
 // ============================================================
 // ウィジェットのタップ（URL に habit=名前）なら、その習慣の今日を記録する
 const LINK = (args.queryParameters || {}).habit;
-const family = LINK ? null : config.widgetFamily || (config.runsInApp ? await chooseAction() : "medium");
-if (LINK) {
+const FROM_SHORTCUT = args.shortcutParameter != null && String(args.shortcutParameter).trim() !== "";
+const family = LINK || FROM_SHORTCUT ? null : config.widgetFamily || (config.runsInApp ? await chooseAction() : "medium");
+if (FROM_SHORTCUT) {
+  await notifyNow(args.shortcutParameter);
+} else if (LINK) {
   await recordToday(LINK);
 } else if (family === "record") {
   await recordMenu();
@@ -1054,4 +1205,5 @@ if (LINK) {
   if (config.runsInApp) await preview(widget, family);
   else Script.setWidget(widget);
 }
+await syncNotifications();
 Script.complete();

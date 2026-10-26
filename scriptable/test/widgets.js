@@ -1,5 +1,5 @@
 // COUNTDOWN / TODO / HABIT の検査：機種別の収まり（5 機種 × 全サイズ × ケース）と、計算・記録の回帰テスト
-const { run, dump, FDate, FILES, reset, H, W, DEV, ascii, shot } = require('./harness');
+const { run, dump, FDate, FILES, PENDING, reset, H, W, DEV, ascii, shot } = require('./harness');
 let fail = 0; const check = (n, ok, x = '') => { if (!ok) fail++; console.log((ok ? 'OK  ' : 'NG  ') + n + (x ? '  ' + x : '')); };
 const T = (d, h, m = 0) => new FDate(2026, 9, 5 + d, h, m);   // 基準日 2026-10-05（月）
 
@@ -208,6 +208,34 @@ const CASES = {
     FILES.delete('/icloud/habit/extraLarge.json');
     FILES.delete('/icloud/habit/habits.json');
     FILES.delete('/icloud/habit/medium.json');
+  }
+
+  // 通知（▶ 編集の 4 番目「通知を設定する」→ 習慣 → 時刻 → 方式）
+  {
+    const H = 'habit-widget.js';
+    seedHabit(HAB.NONE);
+    FILES.set('/icloud/habit/habits.json', JSON.stringify(['A', 'B']));
+    const pend = name => [...PENDING.values()].filter(n => n.title === name).map(n => ymd(n.trigger) + ' ' + String(n.trigger.getHours()).padStart(2, '0') + ':' + String(n.trigger.getMinutes()).padStart(2, '0'));
+    r = await run({ file: H, app: true, now: T(0, 12), sheets: [2, 4, 0, 0], texts: ['２２時'] });
+    check('HABIT 通知：予約方式は今日から 7 日分を 22:00 に（全角・「時」も読む）', JSON.parse(FILES.get('/icloud/habit/notify.json')).A.mode === 'app' && pend('A').length === 7 && pend('A')[0] === '2026-10-05 22:00', pend('A').join(','));
+    check('HABIT 通知：タップ先はその習慣の記録', [...PENDING.values()][0].openURL.endsWith('&habit=A'));
+    await run({ file: H, app: true, now: T(0, 13), query: { habit: 'A' } });
+    check('HABIT 通知：今日記録したら今日の分は外す', pend('A').length === 6 && pend('A')[0] === '2026-10-06 22:00', pend('A').join(','));
+    await run({ file: H, family: 'medium', now: T(0, 23) });
+    check('HABIT 通知：ウィジェットが動くたびに 7 日先まで組み直す', pend('A').length === 6 && pend('A')[5] === '2026-10-11 22:00', pend('A').join(','));
+    r = await run({ file: H, app: true, now: T(0, 12), sheets: [2, 4, 1, 1], texts: ['7:30'] });
+    check('HABIT 通知：オートメーション方式は予約しない（作り方を案内）', JSON.parse(FILES.get('/icloud/habit/notify.json')).B.time === '07:30' && !pend('B').length && r.log.some(l => l.includes('オートメーションを作って')));
+    r = await run({ file: H, shortcut: 'B', now: T(1, 7, 30) });
+    check('HABIT 通知：オートメーションから実行 → まだならすぐ通知', r.log.some(l => l.startsWith('notify B｜')), r.log.join(' | '));
+    await run({ file: H, app: true, now: T(1, 7, 31), query: { habit: 'B' } });
+    r = await run({ file: H, shortcut: 'A,B', now: T(1, 7, 40) });
+    check('HABIT 通知：記録済みなら鳴らさない（A はまだなので鳴る）', !r.log.some(l => l.startsWith('notify B')) && r.log.some(l => l.startsWith('notify A｜')), r.log.join(' | '));
+    r = await run({ file: H, app: true, now: T(1, 8), sheets: [2, 4, 0], texts: ['あとで'] });
+    check('HABIT 通知：読めない時刻は断る', r.log.some(l => l.includes('時刻を読めません')));
+    await run({ file: H, app: true, now: T(1, 8), sheets: [2, 1, 0], texts: ['A2'] });
+    check('HABIT 通知：名前を変えると通知も引き継ぐ', JSON.parse(FILES.get('/icloud/habit/notify.json')).A2.time === '22:00' && pend('A2').length === 7, pend('A2').join(','));
+    await run({ file: H, app: true, now: T(1, 8), sheets: [2, 4, 0], texts: [''] });
+    check('HABIT 通知：時刻を空にすると外す', !JSON.parse(FILES.get('/icloud/habit/notify.json')).A2 && !PENDING.size);
   }
 
   seedHabit(null);

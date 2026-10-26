@@ -90,6 +90,10 @@ iPhone と iPad（11 インチ）に置く自作のカレンダーウィジェ�
 - COUNTDOWN の **▶ →「カウントダウンを編集」**（2026-10-08 ユーザー依頼「LAUNCHER のようにコードを触らず選べるように」）：UITable で登録中の一覧（タップで名前変更・✕）／＋ カレンダーの予定から選ぶ（1 年先・月の見出し・タップで ✓）／＋ リマインダーから選ぶ（期限ありの未完了）／＋ 自分で入れる（この日だけ／毎年。`normalizeDate` が 2026/12/24・12/24・全角も読む）。iCloud の `countdown/items.json`（`[{ title, src: cal|rem|manual, id, date }]`）。あれば `CONFIG.events` の代わりに使う（初めて開くと CONFIG.events を移す）。cal・rem は `idOf`（identifier）で元を探し直して日付を合わせ、見つからなければ出さない（繰り返しの予定は登録日にいちばん近い回）
 - COUNTDOWN のリマインダー（2026-10-08 ユーザー依頼「フラグ付きに対応」→「自分で選択できるように」）：期限のある未完了のリマインダーを、▶ →「リマインダーから読む」で選んだ条件（優先度「高」＝priority 1〜4／リスト名／フラグ付き）で足す。設定は iCloud の `countdown/settings.json`（無ければ `CONFIG.reminders`）。**Scriptable はフラグを読めない**ので、ショートカット（リマインダーを検索：フラグ付き・未完了 → Run Script）が名前の一覧を `args.shortcutParameter` で渡し、`countdown/flagged.json` に保存。期限は描き直しのたびにリマインダーから読む。同じ名前・同じ日は 1 つに。手順は `COUNTDOWN.md`
 - HABIT の中・大・特大に出す習慣：▶ →「表示する習慣を選ぶ」→ サイズ（`pickMenu` → `pickFor`。シートでタップして ✓・選んだ順・最大は `PICK_MAX` 中 4／大 6／特大 12・超えたら断る・「選択を外す」で上から最大数に戻る）。iCloud の `habit/medium.json`・`large.json`・`extraLarge.json`（サイズごとに別）。Parameter の習慣名（`PICK`）があればそちらが優先。赤い輪は中に出ている中で今日まだの上の 1 つ。帯の等分は帯（vstack）の上下に伸びるスペーサーを入れて WidgetKit に配分させている（実機で等分になるか未確認）
+- HABIT の通知（2026-10-26 ユーザー依頼・方式は「両方入れて習慣ごとに選ぶ」をユーザーが選択）：▶ →「習慣を編集」→「通知を設定する」→ 習慣 → 時刻（`parseTime`：22:00・22時・全角も読む。空で外す）→ 方式。iCloud の `habit/notify.json`（`{ 名前: { time, mode: app|auto } }`）。名前の変更・削除に追従
+  - app（Scriptable の予約）：`syncNotifications` を実行部の最後で毎回呼び、`habit-notify:` の予約を消して 7 日先まで `setTriggerDate` で入れ直す（今日済みの日は入れない）。iOS の通知は鳴る瞬間にコードが動かないので、記録後しばらく何も動かないと記録済みでも鳴ることがある（ユーザーに説明済み）
+  - auto（ショートカットのオートメーション）：「時刻・毎日・すぐに実行 → Run Script（Parameter に習慣名、カンマで複数）」→ `notifyNow` が今日まだの習慣だけ今すぐ通知。手順は `HABIT-NOTIFY.md`
+  - 通知のタップは `recordUrl`（今日を記録）。テスト環境の `Notification` は予約を `PENDING`（run をまたぐ）に、すぐの通知を log の `notify 題｜本文` に残す。**ウィジェットの中から通知を予約できるかは実機未確認**
 - HABIT の連続日数：今日済みなら今日から、まだなら昨日から数える（今日の途中で 0 に戻らない）
 - HABIT は ▶ メニューに「今日の記録をつける」「過去 7 日の記録を直す」。記録の反映には iOS の更新を待つので少し遅れることがある
 - HABIT はスクリプト名がタップ先の URL に入るため、名前を変えたらウィジェットを置き直す
@@ -191,6 +195,7 @@ launcher-widget.js            アプリランチャー
 tilt-clock-widget.js          90 度回した時計（ロック画面用・30 分刻み）
 hourglass-widget.js           iOS タイマーと連動する砂時計
 HOURGLASS.md                  砂時計のショートカットの作り方（ユーザー向け）
+HABIT-NOTIFY.md               HABIT の通知の設定とオートメーションの作り方（ユーザー向け）
 COUNTDOWN.md                  カウントダウンの編集・リマインダーを出す設定・フラグ用ショートカット（ユーザー向け）
 LAUNCHER-SHORTCUTS.md         よく使うアプリをショートカットのウィジェットに置く手順（ユーザー向け）
 CLAUDE.md                     この文書
