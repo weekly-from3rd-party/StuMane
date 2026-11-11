@@ -1,0 +1,39 @@
+# 自作分割キーボード（1台目）— Claude への指示
+
+このディレクトリは自作分割キーボード1台目の作業場所。リポジトリの他の部分（Scriptable など）とは無関係。
+
+## プロジェクトの前提
+- 設計は Auto-KDK（https://auto-kdk.pages.dev/）。基板・ケース・ファーム設定まで自動生成、配線も自動。
+- コントローラは Auto-KDK 無線版（nRF52840、ZMK）を2枚。分割、右手親指トラックボール1個。
+- 製造: 基板＋部品実装は JLCPCB、ケースは JLC3DP。
+- 配列は roBa と ZaruBall v3 を参考にする（`layouts/` を参照）。
+- Claude の担当: ZMK ファームの拡張（スクロール、トラボ感度、レイヤー、日本語入力）、キーマップ設計、生成データの解説と検証。
+
+## 作業の原則
+1. **根拠を示す。** ピン配置・部品・設定は、製造データ・公式ドキュメント・参照リポジトリのファイル名と行を添えて答える。記憶だけで断定しない。
+2. **別の方法で確かめる。** 数値や対応表は、計算や別資料で確かめてから出す（例: 予算の合計は式で出す）。
+3. **未確認は未確認と書く。** 推測は推測と明記する（例: トラボ位置の「概略」）。
+4. **踏んだ罠は下の「罠と対処」に追記する。** 対処法も一緒に書く。
+
+## 守ること（安全・発注）
+- Li-Po 電池は保護回路付き 1S、400mAh 以上、6×31×52mm 以内、PH 2ピン（2mm）。挿す前に＋−の向きを確認。組み立て中は電池と USB を外す。
+- 発注前に「無線版コントローラを選んでいるか」を再確認する（参考記事で取り違えが起きた）。
+- 無線版でトラボを置いた側は「行数＋列数」14本まで。
+- ケースに入れる前に、基板単体で全キーとトラボを確認する。
+
+## ツール（クラウド環境）
+- 新しいコンテナでは最初に `bash tools/setup.sh` を実行する。
+- 配列図: `python3 layouts/build_layouts.py`（keymap-drawer で SVG を出力）。
+- Auto-KDK の画面確認: `node tools/autokdk_screenshot.js <出力.png>`。
+- ネットワーク許可済み: auto-kdk.pages.dev, zmk.dev, deepwiki.com, booth.pm, zenn.dev, qiita.com, note.com, ZaruBall の Notion ページ。GitHub の公開リポジトリは `git clone` で読める。
+
+## 参照リポジトリ
+- roBa: https://github.com/kumamuk-git/zmk-config-roBa
+- ZaruBall: https://github.com/ImSota/zmk-config-ZaruBall （解説: ZaruBall v3 の Notion ページ）
+- Auto-KDK: https://github.com/sekigon-gonnoc/auto-kdk （トラボは manual/TrackBall.md）
+
+## 罠と対処
+- roBa は「5列＋内側1列」で、外側（Tab/Shift）の列は無い。最初の配列図で外側の列があるものとして描き、roBa.keymap で確認して直した。→ 配列の話は dtsi と keymap を読んでから。
+- ZaruBall の dtsi は左32位置（公称は左31キー＋エンコーダー）。差の1位置はエンコーダー押下と思われるが未確認。
+- Auto-KDK（2026-11-08 版）の拡張モジュールは Trackball / Trackpad / Pointing Stick のみ。ロータリーエンコーダーは無い。
+- pip で keymap-drawer を入れると Debian の pyparsing と衝突する → `--ignore-installed pyparsing` を付ける。
