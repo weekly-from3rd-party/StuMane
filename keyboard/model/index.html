@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>提案B 3Dモデル</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1b1d22; color: #ddd; font-family: sans-serif; }
+  #c { display: block; width: 100vw; height: 100vh; }
+  #note { position: fixed; left: 12px; bottom: 10px; font-size: 12px; opacity: .75; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="note">提案B（Choc V2 19mm・右手トラボ）／寸法は概略／ドラッグで回転・ホイールで拡大</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+const canvas = document.getElementById('c');
+const width = innerWidth, height = innerHeight;
+const code = await (await fetch('scene.js')).text();
+new Function('THREE', 'OrbitControls', 'canvas', 'width', 'height', code)(THREE, OrbitControls, canvas, width, height);
+</script>
+</body>
+</html>
