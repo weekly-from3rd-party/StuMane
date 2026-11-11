@@ -9,6 +9,9 @@
 - **配列は提案B（roBa＋数字行、53キー：左28／右25）に決定。** Auto-KDK 用は `autokdk/proposal-b.autokdk.json`。
 - レイヤー案は `layouts/keymap-proposal-b.*`（BASE / NUM テンキー / SYM / NAV / MOUSE）。
 - スクロールは、まずボール（MOUSE レイヤー）。左手のツマミ（EC11）は組み立て後の改造として計画（`autokdk/README.md`）。
+- 使う機器: iPhone、iPad、Windows（Bluetooth の接続先を切り替えて使う）。iPad/iPhone はコピー等が Cmd(=Win キー位置)、Windows は Ctrl なので、キーマップで OS 切替を考える。
+- 日本語入力の切替: iPadOS で LANG1/LANG2（かな/英数）が効くかは未確認。実機で試す（だめなら Ctrl+Space 等）。
+- スイッチは未決（MX / Choc V2 / Gateron LP 3.0）。Auto-KDK README: JLCPCB の部品実装は MX ソケット（MX と GLP3 に対応）。Choc 用ソケットは事前送付が必要。
 - Claude の担当: ZMK ファームの拡張（スクロール、トラボ感度、レイヤー、日本語入力）、キーマップ設計、生成データの解説と検証。
 
 ## 作業の原則
