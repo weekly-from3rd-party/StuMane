@@ -6,7 +6,9 @@
 - 設計は Auto-KDK（https://auto-kdk.pages.dev/）。基板・ケース・ファーム設定まで自動生成、配線も自動。
 - コントローラは Auto-KDK 無線版（nRF52840、ZMK）を2枚。分割、右手親指トラックボール1個。
 - 製造: 基板＋部品実装は JLCPCB、ケースは JLC3DP。
-- 配列は roBa と ZaruBall v3 を参考にする（`layouts/` を参照）。
+- **配列は提案B（roBa＋数字行、53キー：左28／右25）に決定。** Auto-KDK 用は `autokdk/proposal-b.autokdk.json`。
+- レイヤー案は `layouts/keymap-proposal-b.*`（BASE / NUM テンキー / SYM / NAV / MOUSE）。
+- スクロールは、まずボール（MOUSE レイヤー）。左手のツマミ（EC11）は組み立て後の改造として計画（`autokdk/README.md`）。
 - Claude の担当: ZMK ファームの拡張（スクロール、トラボ感度、レイヤー、日本語入力）、キーマップ設計、生成データの解説と検証。
 
 ## 作業の原則
@@ -25,6 +27,8 @@
 - 新しいコンテナでは最初に `bash tools/setup.sh` を実行する。
 - 配列図: `python3 layouts/build_layouts.py`（keymap-drawer で SVG を出力）。
 - Auto-KDK の画面確認: `node tools/autokdk_screenshot.js <出力.png>`。
+- Auto-KDK に JSON を読み込んで干渉チェック: `node tools/autokdk_import.js <json> <接頭辞>`、自動配線: `node tools/autokdk_route.js <json> <接頭辞>`。
+- レイヤー図: `python3 layouts/keymap_proposal_b.py`。
 - ネットワーク許可済み: auto-kdk.pages.dev, zmk.dev, deepwiki.com, booth.pm, zenn.dev, qiita.com, note.com, ZaruBall の Notion ページ。GitHub の公開リポジトリは `git clone` で読める。
 
 ## 参照リポジトリ
@@ -35,5 +39,9 @@
 ## 罠と対処
 - roBa は「5列＋内側1列」で、外側（Tab/Shift）の列は無い。最初の配列図で外側の列があるものとして描き、roBa.keymap で確認して直した。→ 配列の話は dtsi と keymap を読んでから。
 - ZaruBall の dtsi は左32位置（公称は左31キー＋エンコーダー）。差の1位置はエンコーダー押下と思われるが未確認。
-- Auto-KDK（2026-11-08 版）の拡張モジュールは Trackball / Trackpad / Pointing Stick のみ。ロータリーエンコーダーは無い。
+- Auto-KDK（2026-11-08 版）の拡張モジュールは Trackball / Trackpad / Pointing Stick のみ。データ形式に `encoder` 欄はあるが、有効にして Import しても表示されない。
+- Auto-KDK の JSON のモジュール座標 (x, y) は **中心**（左上ではない）。最初は左上と思って作り、トラボがキーに重なった。→ Import して Placement Editor の目盛りで確かめる。
+- 親指キー L1-Spc の隙間がキーキャップで 0.4mm になり警告が出た → 0.04〜0.06U 離して解消。
+- 右手にトラボを置くと右手が Central（親機）。ZMK Studio は右手を USB につなぐ。
+- Playwright のスクリプトをシェルの heredoc で書くと、安全チェックに止められることがある → ファイルに書いてから実行する。
 - pip で keymap-drawer を入れると Debian の pyparsing と衝突する → `--ignore-installed pyparsing` を付ける。

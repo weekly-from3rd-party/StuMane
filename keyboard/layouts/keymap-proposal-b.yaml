@@ -1,0 +1,271 @@
+layers:
+  "0 BASE（通常）":
+    - "1"
+    - "2"
+    - "3"
+    - "4"
+    - "5"
+    - "Q"
+    - "W"
+    - "E"
+    - "R"
+    - "T"
+    - "A"
+    - "S"
+    - "D"
+    - "F"
+    - "G"
+    - "Esc"
+    - {"t": "Z", "h": "Shift"}
+    - "X"
+    - "C"
+    - "V"
+    - "B"
+    - "Tab"
+    - "Ctrl"
+    - "Win"
+    - "Alt"
+    - {"t": "英数", "h": "NUM"}
+    - {"t": "Spc", "h": "SYM"}
+    - {"t": "かな", "h": "NAV"}
+    - "6"
+    - "7"
+    - "8"
+    - "9"
+    - "0"
+    - "Y"
+    - "U"
+    - "I"
+    - "O"
+    - "P"
+    - "-"
+    - "H"
+    - "J"
+    - "K"
+    - "L"
+    - ";"
+    - "="
+    - "N"
+    - "M"
+    - ","
+    - "."
+    - {"t": "/", "h": "Shift"}
+    - {"t": "BS", "h": "NAV"}
+    - {"t": "Ent", "h": "SYM"}
+    - "Del"
+  "1 NUM（テンキー）":
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - "Esc"
+    - "Home"
+    - "↑"
+    - "End"
+    - "PgUp"
+    - "Tab"
+    - "←"
+    - "↓"
+    - "→"
+    - "PgDn"
+    - "固定"
+    - "Undo"
+    - "Cut"
+    - "Copy"
+    - "Paste"
+    - "Redo"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - "("
+    - ")"
+    - "%"
+    - "NumLk"
+    - "BS"
+    - "/"
+    - "7"
+    - "8"
+    - "9"
+    - "-"
+    - "="
+    - "*"
+    - "4"
+    - "5"
+    - "6"
+    - "+"
+    - ","
+    - "Tab"
+    - "1"
+    - "2"
+    - "3"
+    - "Ent"
+    - "0"
+    - "."
+    - {"t": "▽", "type": "trans"}
+  "2 SYM（記号）":
+    - "F1"
+    - "F2"
+    - "F3"
+    - "F4"
+    - "F5"
+    - "!"
+    - "@"
+    - "#"
+    - "$"
+    - "%"
+    - "`"
+    - "~"
+    - "["
+    - "]"
+    - "\\"
+    - "|"
+    - "_"
+    - "+"
+    - "{"
+    - "}"
+    - "="
+    - "-"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - "F6"
+    - "F7"
+    - "F8"
+    - "F9"
+    - "F10"
+    - "^"
+    - "&"
+    - "*"
+    - "("
+    - ")"
+    - "_"
+    - "'"
+    - "\""
+    - ":"
+    - "<"
+    - ">"
+    - "+"
+    - "?"
+    - "{"
+    - "}"
+    - "F11"
+    - "F12"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+  "3 NAV（移動・機能）":
+    - "BT1"
+    - "BT2"
+    - "BT3"
+    - "BT4"
+    - "BT5"
+    - "BTclr"
+    - "USB/BT"
+    - "Vol-"
+    - "Vol+"
+    - "Mute"
+    - "Ctrl"
+    - "Shift"
+    - "Alt"
+    - "Win"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - "Boot"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - "Ins"
+    - "PrtSc"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - "Home"
+    - "PgDn"
+    - "PgUp"
+    - "End"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - "←"
+    - "↓"
+    - "↑"
+    - "→"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - "C-←"
+    - "C-↓"
+    - "C-↑"
+    - "C-→"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+  "4 MOUSE（トラボで自動）":
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "Scroll", "h": "押す間"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - "Back"
+    - "LClk"
+    - "RClk"
+    - "MClk"
+    - {"t": "Scroll", "h": "押す間"}
+    - {"t": "▽", "type": "trans"}
+    - "Fwd"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
