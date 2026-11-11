@@ -53,7 +53,61 @@ layers:
     - {"t": "BS", "h": "NAV"}
     - {"t": "Ent", "h": "SYM"}
     - "Del"
-  "1 NUM（テンキー）":
+  "1 IPAD（⌘を小指へ）":
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - "⌘"
+    - "Ctrl"
+    - "Option"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+  "2 NUM（テンキー）":
     - {"t": "▽", "type": "trans"}
     - {"t": "▽", "type": "trans"}
     - {"t": "▽", "type": "trans"}
@@ -107,7 +161,61 @@ layers:
     - "0"
     - "."
     - {"t": "▽", "type": "trans"}
-  "2 SYM（記号）":
+  "3 NUM_IPAD（自動）":
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - "⌘Z"
+    - "⌘X"
+    - "⌘C"
+    - "⌘V"
+    - "⌘⇧Z"
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+    - {"t": "▽", "type": "trans"}
+  "4 SYM（記号）":
     - "F1"
     - "F2"
     - "F3"
@@ -161,7 +269,7 @@ layers:
     - {"t": "▽", "type": "trans"}
     - {"t": "▽", "type": "trans"}
     - {"t": "▽", "type": "trans"}
-  "3 NAV（移動・機能）":
+  "5 NAV（移動・機能）":
     - "BT1"
     - "BT2"
     - "BT3"
@@ -179,7 +287,7 @@ layers:
     - {"t": "▽", "type": "trans"}
     - {"t": "▽", "type": "trans"}
     - "Boot"
-    - {"t": "▽", "type": "trans"}
+    - "iPad⇄Win"
     - {"t": "▽", "type": "trans"}
     - {"t": "▽", "type": "trans"}
     - {"t": "▽", "type": "trans"}
@@ -215,7 +323,7 @@ layers:
     - {"t": "▽", "type": "trans"}
     - {"t": "▽", "type": "trans"}
     - {"t": "▽", "type": "trans"}
-  "4 MOUSE（トラボで自動）":
+  "6 MOUSE（トラボで自動）":
     - {"t": "▽", "type": "trans"}
     - {"t": "▽", "type": "trans"}
     - {"t": "▽", "type": "trans"}

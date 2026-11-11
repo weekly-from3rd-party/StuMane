@@ -32,7 +32,9 @@ def layer(left, right):
 TR5, TR6 = [T] * 5, [T] * 6
 
 LAYERS = {
-    # 0: 通常入力。roBa と同じく Z と / は長押しで Shift。
+    # 0: 通常入力（Windows 用）。roBa と同じく Z と / は長押しで Shift。
+    # 英数 = LANG2 と 無変換 を続けて送る / かな = LANG1 と 変換 を続けて送る（iPad と Windows の両方で効かせるため）。
+    # 記号はラベルの文字が出るように、JIS 配列用のキーコードで実装する（../firmware/jp_keys.h）。
     "0 BASE（通常）": layer(
         side(["1", "2", "3", "4", "5"],
              ["Q", "W", "E", "R", "T"],
@@ -44,8 +46,12 @@ LAYERS = {
              ["-", "H", "J", "K", "L", ";"],
              ["=", "N", "M", ",", ".", ht("/", "Shift")],
              [ht("BS", "NAV"), ht("Ent", "SYM"), "Del"])),
-    # 1: テンキー。右手にテンキー、左手に移動・編集。左の内側(Esc の位置)で固定/解除。
-    "1 NUM（テンキー）": layer(
+    # iPad/iPhone モード（NAV の「iPad⇄Win」で切替）。⌘ と Ctrl の位置を入れ替えるだけで、他は BASE を透過。
+    "1 IPAD（⌘を小指へ）": layer(
+        side(TR5, TR5, TR6, TR6, ["⌘", "Ctrl", "Option", T, T, T]),
+        side(TR5, TR5, TR6, TR6, [T, T, T])),
+    # 2: テンキー。右手にテンキー、左手に移動・編集。左の内側(Esc の位置)で固定/解除。
+    "2 NUM（テンキー）": layer(
         side(TR5,
              ["Esc", "Home", "↑", "End", "PgUp"],
              ["Tab", "←", "↓", "→", "PgDn", "固定"],
@@ -56,8 +62,14 @@ LAYERS = {
              ["=", "*", "4", "5", "6", "+"],
              [",", "Tab", "1", "2", "3", "Ent"],
              ["0", ".", T])),
-    # 2: 記号。左右どちらの親指でも入れる。
-    "2 SYM（記号）": layer(
+    # NUM と IPAD が両方オンのとき自動で重なる（ZMK の conditional layer）。編集キーを ⌘ 版にする。
+    "3 NUM_IPAD（自動）": layer(
+        side(TR5, TR5, TR6,
+             ["⌘Z", "⌘X", "⌘C", "⌘V", "⌘⇧Z", T],
+             [T, T, T, T, T, T]),
+        side(TR5, TR5, TR6, TR6, [T, T, T])),
+    # 4: 記号。左右どちらの親指でも入れる。
+    "4 SYM（記号）": layer(
         side(["F1", "F2", "F3", "F4", "F5"],
              ["!", "@", "#", "$", "%"],
              ["`", "~", "[", "]", "\\", "|"],
@@ -68,20 +80,20 @@ LAYERS = {
              ["_", "'", "\"", ":", "<", ">"],
              ["+", "?", "{", "}", "F11", "F12"],
              [T, T, T])),
-    # 3: 移動・機能。矢印は右手ホーム(HJKL)、Bluetooth 切替と音量は左手。
-    "3 NAV（移動・機能）": layer(
+    # 5: 移動・機能。矢印は右手ホーム(HJKL)、Bluetooth 切替と音量は左手。
+    "5 NAV（移動・機能）": layer(
         side(["BT1", "BT2", "BT3", "BT4", "BT5"],
              ["BTclr", "USB/BT", "Vol-", "Vol+", "Mute"],
              ["Ctrl", "Shift", "Alt", "Win", T, T],
-             ["Boot", T, T, T, T, T],
+             ["Boot", "iPad⇄Win", T, T, T, T],
              [T, T, T, T, T, T]),
         side(["Ins", "PrtSc", T, T, T],
              ["Home", "PgDn", "PgUp", "End", T],
              [T, "←", "↓", "↑", "→", T],
              [T, "C-←", "C-↓", "C-↑", "C-→", T],
              [T, T, T])),
-    # 4: マウス。トラボを動かすと自動で入り、しばらく触らないと抜ける（ZMK の auto mouse）。
-    "4 MOUSE（トラボで自動）": layer(
+    # 6: マウス。トラボを動かすと自動で入り、しばらく触らないと抜ける（ZMK の auto mouse）。
+    "6 MOUSE（トラボで自動）": layer(
         side(TR5, TR5,
              [T, T, T, ht("Scroll", "押す間"), T, T],
              TR6,

@@ -1,7 +1,7 @@
 {
  "layout": {
   "isSplit": true,
-  "switchType": "mx-19",
+  "switchType": "choc2-19",
   "keyboardName": "propBenc",
   "controllerType": "wireless",
   "leftData": {
@@ -373,7 +373,7 @@
      "x": 3.5,
      "y": 0,
      "a": 0,
-     "variant": "side-2",
+     "variant": "side-1",
      "width": 2,
      "height": 1,
      "row": 6,
@@ -760,7 +760,7 @@
      "variant": ""
     },
     "controller": {
-     "x": 3.5,
+     "x": 6.5,
      "y": 0,
      "a": 0,
      "variant": "side-1",
@@ -798,8 +798,6 @@
   }
  },
  "case": {
-  "topHeight": 11.5,
-  "plateHeight": 5,
   "connectorHeight": 2.5,
   "switchBoardHeight": 1.6,
   "controllerBoardHeight": 1.6,
@@ -807,7 +805,7 @@
   "partsHeight": 2.5,
   "usbHeight": 3.5,
   "bottomMinThickness": 3,
-  "tiltingAngle": 5,
+  "tiltingAngle": 5.1,
   "tentingAngle": 0,
   "topRim": 3,
   "bottomRim": 3,
@@ -815,6 +813,12 @@
   "chamferAngle": 30,
   "switchEmbankment": 0,
   "snapDirection": "horizontal",
-  "mountType": "integrated"
+  "mountType": "integrated",
+  "topHeight": 6.5,
+  "plateHeight": 2.2,
+  "powerSwitchKnobHeight": 4,
+  "chamferType": "C",
+  "lowerChamferHeight": 2,
+  "cornerType": "default"
  }
 }

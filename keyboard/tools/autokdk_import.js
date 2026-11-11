@@ -5,8 +5,8 @@ const { chromium } = require('playwright');
 
 async function report(page, label, out) {
   const text = await page.innerText('body');
-  const i = text.indexOf('Interference Check');
-  console.log(`[${label}]`, i >= 0 ? text.slice(i, i + 200).replace(/\n+/g, ' / ') : '(no interference section)');
+  const found = [...text.matchAll(/Interference Check\s*\n([^\n]+)/g)].map((m) => m[1].trim());
+  console.log(`[${label}] Interference Check (左, 右の順):`, found.length ? found.join(' | ') : '(not found)');
   await page.screenshot({ path: `${out}-${label}.png`, fullPage: true });
 }
 

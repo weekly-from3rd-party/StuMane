@@ -9,9 +9,13 @@
 - **配列は提案B（roBa＋数字行、53キー：左28／右25）に決定。** Auto-KDK 用は `autokdk/proposal-b.autokdk.json`。
 - レイヤー案は `layouts/keymap-proposal-b.*`（BASE / NUM テンキー / SYM / NAV / MOUSE）。
 - スクロールは、まずボール（MOUSE レイヤー）。左手のツマミ（EC11）は組み立て後の改造として計画（`autokdk/README.md`）。
-- 使う機器: iPhone、iPad、Windows（Bluetooth の接続先を切り替えて使う）。iPad/iPhone はコピー等が Cmd(=Win キー位置)、Windows は Ctrl なので、キーマップで OS 切替を考える。
-- 日本語入力の切替: iPadOS で LANG1/LANG2（かな/英数）が効くかは未確認。実機で試す（だめなら Ctrl+Space 等）。
-- スイッチは未決（MX / Choc V2 / Gateron LP 3.0）。Auto-KDK README: JLCPCB の部品実装は MX ソケット（MX と GLP3 に対応）。Choc 用ソケットは事前送付が必要。
+- 使う機器: iPhone、iPad、Windows（Bluetooth の接続先を切り替えて使う）。Windows は Dell ノートで **JIS 配列**（OS も日本語キーボード設定）。
+- 記号は JIS 配列用のキーコードで実装する（`firmware/jp_keys.h`）。iPad/iPhone もハードウェアキーボードを JIS にそろえる（実機で要確認）。
+- OS 切替: NAV の「iPad⇄Win」で IPAD レイヤーを切替（⌘ と Ctrl の位置を入れ替え）。NUM と重なると NUM_IPAD が自動で入る。
+- 日本語入力の切替: 英数＝LANG2＋無変換、かな＝LANG1＋変換 を続けて送る。Windows は IME 設定で 無変換→IME-オフ、変換→IME-オン にする。
+  iPadOS で LANG1/LANG2 が効くかは未確認。実機で試す（だめなら Ctrl+Space 等）。
+- **スイッチは Choc V2（19mm ピッチ）に決定。** 理由: 基本は机だが持ち歩きもする。19mm なので MX 軸の薄型キーキャップが使える。
+  JLCPCB の部品実装はダイオードのみ（Choc 用ソケットは事前送付が必要なので、ソケットは自分ではんだ付けする想定）。
 - Claude の担当: ZMK ファームの拡張（スクロール、トラボ感度、レイヤー、日本語入力）、キーマップ設計、生成データの解説と検証。
 
 ## 作業の原則
@@ -46,5 +50,7 @@
 - Auto-KDK の JSON のモジュール座標 (x, y) は **中心**（左上ではない）。最初は左上と思って作り、トラボがキーに重なった。→ Import して Placement Editor の目盛りで確かめる。
 - 親指キー L1-Spc の隙間がキーキャップで 0.4mm になり警告が出た → 0.04〜0.06U 離して解消。
 - 右手にトラボを置くと右手が Central（親機）。ZMK Studio は右手を USB につなぐ。
+- Choc V2 にしたら左手の ROW4 が自動配線できなかった。コントローラの位置を変えても、基板を広げても駄目で、左コントローラの向きを side-2→side-1（コネクタが左＝外側）にしたら通った。右手はコントローラを数字行の右端（"0"）の列に合わせると通った。
+- スイッチ種類を変えるとケースの寸法（topHeight など）も変わる。値は Auto-KDK で切り替えて Export したものを使う（`tools/autokdk_export.js`）。
 - Playwright のスクリプトをシェルの heredoc で書くと、安全チェックに止められることがある → ファイルに書いてから実行する。
 - pip で keymap-drawer を入れると Debian の pyparsing と衝突する → `--ignore-installed pyparsing` を付ける。

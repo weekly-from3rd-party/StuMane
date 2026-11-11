@@ -2,7 +2,7 @@
 
 | ファイル | 内容 |
 |---|---|
-| `proposal-b.autokdk.json` | **これを使う。** Auto-KDK の「Import」で読み込む提案B（53キー、無線分割、右手34mmトラボ） |
+| `proposal-b.autokdk.json` | **これを使う。** Auto-KDK の「Import」で読み込む提案B（53キー、Choc V2 19mm、無線分割、右手34mmトラボ） |
 | `proposal-b-encoder.autokdk.json` | 左手に encoder モジュールを有効化した実験版。Auto-KDK は読み込んでも表示しない（下記） |
 | `build_autokdk.py` | 上の JSON を `../layouts/build_layouts.py` の座標から生成する |
 
@@ -13,13 +13,17 @@ node ../tools/autokdk_route.js  proposal-b.autokdk.json /tmp/route   # 自動配
 ```
 
 ## 確認済み（Auto-KDK ver 2026-11-08）
+- スイッチは **Choc V2（19mm）**（`switchType: choc2-19`）。ケース寸法は Auto-KDK が Choc V2 用に出す値。
 - Import すると左右とも提案Bの形で読み込まれる。干渉チェックは左右とも **0 errors · 0 warnings**。
 - 自動配線（Start Routing）は左右とも **Success to route**。
+- コントローラ: 左は `side-1`（コネクタが外側）で数字行 "4" の列、右は `side-1` で数字行 "0" の列。
+  Choc V2 で左を `side-2` にすると ROW4 が配線できなかった。
 - ピン: 左 5行＋6列＝11本（上限18）、右 11本（トラボありの上限14）。
 - 右手にトラボを置くので、**右手が Central（親機）**。ZMK Studio で設定するときは右手を USB につなぐ（Auto-KDK README 4.14）。
 
 ## 決めずに残していること
-- スイッチ: JSON は `mx-19`（Cherry MX）。Choc V2 / Gateron LP 3.0 にするなら Auto-KDK の Switch Type で変える。
+- ソケット: JLCPCB の部品実装は MX 用ソケットのみ。Choc V2 用ソケット（Kailh Choc ホットスワップソケット）は、
+  事前に JLCPCB へ送るか、自分ではんだ付けする（片手28/25キー分＋予備）。ダイオードは自動実装でよい。
 - ケース: チルト5°、テント0°、インテグレーテッドマウント。手に合わせて Case Editor で調整する。
 - 名前: `propB`（英数字15文字まで）。
 

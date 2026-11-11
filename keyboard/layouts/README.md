@@ -25,10 +25,14 @@
 
 | レイヤー | 入り方 | 内容 |
 |---|---|---|
-| 0 BASE | 通常 | QWERTY。Z と / は長押しで Shift |
-| 1 NUM（テンキー） | 「英数」を長押し。左内側の「固定」で固定/解除 | 右手にテンキー（789/456/123/0.）、左手に矢印と Undo/Copy/Paste |
-| 2 SYM（記号） | Spc か Ent を長押し | 記号と F1〜F12 |
-| 3 NAV（移動・機能） | 「かな」か BS を長押し | HJKL の矢印、Home/End、Bluetooth 切替、音量、書き込みモード |
-| 4 MOUSE | トラボを動かすと自動 | クリック、戻る/進む。Scroll を押す間はボールでスクロール |
+| 0 BASE | 通常（Windows 用） | QWERTY。Z と / は長押しで Shift。記号は JIS 配列用キーコード（`../firmware/jp_keys.h`） |
+| 1 IPAD | NAV の「iPad⇄Win」で切替 | ⌘ を小指（Ctrl の位置）、Ctrl をその右に。ほかは BASE と同じ |
+| 2 NUM（テンキー） | 「英数」を長押し。左内側の「固定」で固定/解除 | 右手にテンキー（789/456/123/0.）、左手に矢印と Undo/Copy/Paste |
+| 3 NUM_IPAD | NUM と IPAD が両方オンのとき自動 | Undo/Copy/Paste を ⌘ 版に |
+| 4 SYM（記号） | Spc か Ent を長押し | 記号と F1〜F12 |
+| 5 NAV（移動・機能） | 「かな」か BS を長押し | HJKL の矢印、Bluetooth 切替（BT1〜5）、OS 切替、音量、書き込みモード |
+| 6 MOUSE | トラボを動かすと自動 | クリック、戻る/進む。Scroll を押す間はボールでスクロール |
+
+英数キーは LANG2＋無変換、かなキーは LANG1＋変換 を続けて送る（Windows と iPad の両方で効かせるため。iPad は要確認）。
 
 ![レイヤー案](keymap-proposal-b.png)
