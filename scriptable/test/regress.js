@@ -19,6 +19,29 @@ let fail = 0; const check = (n, ok, x = '') => { if (!ok) fail++; console.log((o
     r = await run({ family: fam, now: D.T(0, 11, 15), events: D.A, param: '大学,バイト,日本の祝日' });
     check('絞り込み・' + fam, !r.errs.length && !!r.w.refreshAfterDate, r.errs[0]);
   }
+  // カレンダーのグループ（▶ メニューの最後「カレンダーのグループを編集」。iCloud の today-tomorrow/groups.json）
+  {
+    const titles = n => [...dump(n).matchAll(/"([^"]+)"  <medium/g)].map(m => m[1]).filter(t => !/^\d\d:\d\d$/.test(t));
+    const ev2 = [D.ev('講義', D.T(0, 13), D.T(0, 14), '', false, '大学'), D.ev('シフト', D.T(0, 15), D.T(0, 18), '', false, 'バイト'), D.ev('映画', D.T(0, 19), D.T(0, 21), '', false, '個人')];
+    // メニュー 5 番目（iPhone）→ ＋ 新しいグループ → 名前 → 大学・バイトに ✓ → 保存
+    r = await run({ app: true, now: D.T(0, 11), events: ev2, sheets: [5, 0, 0, 2, 3], texts: ['学校'] });
+    const g = JSON.parse(FILES.get('/icloud/today-tomorrow/groups.json'));
+    check('グループ：カレンダーをタップで選んで名前を付けて保存', g.length === 1 && g[0].name === '学校' && g[0].calendars.join() === 'バイト,大学', JSON.stringify(g));
+    r = await run({ family: 'large', now: D.T(0, 11), events: ev2, param: '学校' });
+    check('グループ：Parameter のグループ名でそのカレンダーだけ', titles(r.w).join() === '講義,シフト', titles(r.w).join());
+    r = await run({ family: 'large', now: D.T(0, 11), events: ev2, param: '個人' });
+    check('グループ：グループに無い名前はカレンダー名として読む', titles(r.w).join() === '映画', titles(r.w).join());
+    r = await run({ family: 'large', now: D.T(0, 11), events: ev2, param: '学校,個人,dark' });
+    check('グループ：グループとカレンダー名を混ぜられる', titles(r.w).length === 3);
+    r = await run({ app: true, now: D.T(0, 11), events: ev2, sheets: [2, 1] });
+    check('グループ：▶ のプレビューでグループを選べる', r.log.some(l => l.startsWith('sheet「どのグループで見ますか」')) && r.log.includes('presentLarge'), r.log.join(' | '));
+    r = await run({ app: true, now: D.T(0, 11), events: ev2, sheets: [5, 0, 1], texts: ['学校2'] });
+    check('グループ：名前を変える', JSON.parse(FILES.get('/icloud/today-tomorrow/groups.json'))[0].name === '学校2');
+    r = await run({ app: true, now: D.T(0, 11), events: ev2, sheets: [5, 1], texts: ['学校2'] });
+    check('グループ：同じ名前は作らない', r.log.some(l => l.includes('同じ名前があります')));
+    r = await run({ app: true, now: D.T(0, 11), events: ev2, sheets: [5, 0, 2], alerts: [0] });
+    check('グループ：削除', JSON.parse(FILES.get('/icloud/today-tomorrow/groups.json')).length === 0);
+  }
   // 時刻ラベル：前日〜／翌日まで／24:00／終日
   r = await run({ family: 'large', now: D.T(0, 0, 30), events: [D.ev('夜間観察', D.T(-1, 22), D.T(0, 1), '野外'), D.ev('徹夜', D.T(0, 20), D.T(1, 0), ''),
                   D.ev('夜行バス', D.T(0, 23), D.T(1, 2), '札幌駅')] });

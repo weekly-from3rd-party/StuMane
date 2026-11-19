@@ -13,12 +13,19 @@
      ロック画面：長方形 / 円形 / インライン
 
    ウィジェット設定の「Parameter」（任意・カンマ区切り）
-     大学,バイト … そのカレンダーだけ表示
+     学校        … ▶ で作ったグループ名。そのグループのカレンダーだけ表示
+     大学,バイト … そのカレンダーだけ表示（カレンダー名を直接書いてもよい）
      dark        … 暗色テーマ（文字が白。暗い壁紙向け）
      透明        … 背景を透明に（下の「透明背景の設定」が必要）
      例）透明,大学
 
    アプリ内で ▶ 実行すると、サイズを選んでプレビューできます。
+
+   カレンダーのグループ（ウィジェットごとに出すカレンダーを分ける）
+     ▶ →「カレンダーのグループを編集」→「＋ 新しいグループ」→ 名前（例：学校）
+     → カレンダーをタップで ✓ →「保存して閉じる」。
+     ウィジェットの Parameter にグループ名を書くと、そのカレンダーだけ出ます。
+     グループは iCloud（today-tomorrow/groups.json）に保存し、iPhone と iPad で共有します。
 
    透明背景の設定（端末ごと・各サイズ 1 つずつ）
      1. ウィジェットを置き、Parameter を「透明」にする → ピンク表示になる
@@ -40,10 +47,12 @@ const PARAMS = String(args.widgetParameter || "")
   .split(/[,、]/).map(s => s.trim()).filter(Boolean);
 const THEME = PARAMS.map(p => p.toLowerCase()).find(p => p === "dark" || p === "light") || CONFIG.theme;
 const CLEAR = PARAMS.some(p => /^(透明|clear)$/i.test(p));
+// Parameter の名前（グループ名かカレンダー名）。グループは loadData で展開する
 const CAL_NAMES = (() => {
   const names = PARAMS.filter(p => !/^(dark|light|透明|clear)$/i.test(p));
   return names.length ? names : CONFIG.calendars;
 })();
+let PREVIEW_NAMES = null;   // ▶ のプレビューで選んだグループ（Parameter の代わり）
 
 // ---------- 色（Nothing デザインテンプレ：白基調） ----------
 const PALETTES = {
@@ -529,18 +538,19 @@ function leftLine(parent, add) {
 // ============================================================
 async function loadData() {
   const now = new Date();
-  const [today, tomorrow] = await Promise.all([loadDay(now, 0), loadDay(now, 1)]);
+  const cals = await resolveCalendars(PREVIEW_NAMES || CAL_NAMES);
+  const [today, tomorrow] = await Promise.all([loadDay(now, 0, cals), loadDay(now, 1, cals)]);
   return { now, today, tomorrow };
 }
 
-async function loadDay(now, offset) {
+async function loadDay(now, offset, cals) {
   const start = dayStart(now, offset);
   const end = dayStart(now, offset + 1);
   const isToday = offset === 0;
 
   let raw = await CalendarEvent.between(start, end);
   raw = raw.filter(e => e.endDate > start && e.startDate < end);
-  if (CAL_NAMES.length) raw = raw.filter(e => e.calendar && CAL_NAMES.includes(e.calendar.title));
+  if (cals.length) raw = raw.filter(e => e.calendar && cals.includes(e.calendar.title));
 
   let events = raw.map(e => {
     const allDay = e.isAllDay || (e.startDate <= start && e.endDate >= end);
@@ -882,12 +892,144 @@ async function pickPhoto() {
 }
 
 // ============================================================
+// カレンダーのグループ（iCloud の today-tomorrow/groups.json = [{ name, calendars: [カレンダー名] }]）
+// ============================================================
+function groupPath(fm) {
+  return fm.joinPath(fm.joinPath(fm.documentsDirectory(), "today-tomorrow"), "groups.json");
+}
+
+function groupStore() {
+  try {
+    return FileManager.iCloud();
+  } catch (e) {
+    return FileManager.local();
+  }
+}
+
+async function loadGroups() {
+  const fm = groupStore();
+  const p = groupPath(fm);
+  if (!fm.fileExists(p)) return [];
+  try {
+    await fm.downloadFileFromiCloud(p);
+    const list = JSON.parse(fm.readString(p));
+    return Array.isArray(list) ? list.filter(g => g && g.name && Array.isArray(g.calendars)) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveGroups(list) {
+  const fm = groupStore();
+  const dir = fm.joinPath(fm.documentsDirectory(), "today-tomorrow");
+  if (!fm.fileExists(dir)) fm.createDirectory(dir, true);
+  fm.writeString(groupPath(fm), JSON.stringify(list));
+}
+
+// グループ名はそのカレンダーに、それ以外はカレンダー名のまま
+async function resolveCalendars(names) {
+  if (!names.length) return [];
+  const groups = await loadGroups();
+  const out = [];
+  names.forEach(n => {
+    const g = groups.find(x => x.name === n);
+    (g ? g.calendars : [n]).forEach(c => { if (!out.includes(c)) out.push(c); });
+  });
+  return out;
+}
+
+async function eventCalendars() {
+  try {
+    return Array.from(new Set((await Calendar.forEvents()).map(c => c.title))).sort();
+  } catch (e) {
+    return [];
+  }
+}
+
+async function groupMenu() {
+  for (;;) {
+    const groups = await loadGroups();
+    const i = await sheet("カレンダーのグループ（Parameter にグループ名を書いて使う）",
+      groups.map(g => g.name + "（" + g.calendars.length + "）").concat(["＋ 新しいグループ"]));
+    if (i < 0) return;
+    if (i === groups.length) {
+      const name = await askGroupName("新しいグループ", "", groups);
+      if (!name) continue;
+      const cals = await pickCalendars(name, []);
+      if (!cals) continue;
+      groups.push({ name, calendars: cals });
+      saveGroups(groups);
+      await notice("作りました", "ウィジェットの Parameter に「" + name + "」と書くと、" + (cals.join("・") || "（カレンダーなし）") + " だけ出ます。");
+      continue;
+    }
+    const g = groups[i];
+    const k = await sheet(g.name + "：" + (g.calendars.join("・") || "カレンダーなし"), ["カレンダーを選ぶ", "名前を変える", "削除する"]);
+    if (k === 0) {
+      const cals = await pickCalendars(g.name, g.calendars);
+      if (cals) { g.calendars = cals; saveGroups(groups); }
+    } else if (k === 1) {
+      const name = await askGroupName("名前を変える", g.name, groups.filter(x => x !== g));
+      if (name) {
+        g.name = name;
+        saveGroups(groups);
+        await notice("名前を変えました", "このグループを使っているウィジェットは、Parameter も「" + name + "」に直してください。");
+      }
+    } else if (k === 2) {
+      const a = new Alert();
+      a.title = "「" + g.name + "」を削除しますか？";
+      a.message = "カレンダー自体は消えません。";
+      a.addDestructiveAction("削除する");
+      a.addCancelAction("キャンセル");
+      if ((await a.presentAlert()) === 0) saveGroups(groups.filter(x => x !== g));
+    }
+  }
+}
+
+async function askGroupName(title, text, others) {
+  const a = new Alert();
+  a.title = title;
+  a.message = "例：学校、プライベート";
+  a.addTextField("グループ名", text || "");
+  a.addAction("決定");
+  a.addCancelAction("キャンセル");
+  if ((await a.presentAlert()) !== 0) return null;
+  const name = String(a.textFieldValue(0) || "").replace(/[,、]/g, " ").replace(/\s+/g, " ").trim();
+  if (!name || /^(dark|light|透明|clear)$/i.test(name)) {
+    await notice("その名前は使えません", "空・dark・light・透明 以外の名前にしてください。");
+    return null;
+  }
+  if (others.some(g => g.name === name)) {
+    await notice("同じ名前があります", "「" + name + "」はもうあります。");
+    return null;
+  }
+  return name;
+}
+
+// タップで ✓ を付け外し →「保存して閉じる」。キャンセルなら null
+async function pickCalendars(name, current) {
+  const all = await eventCalendars();
+  let pick = current.slice();
+  const shown = all.concat(pick.filter(c => !all.includes(c)));
+  if (!shown.length) {
+    await notice("カレンダーが見つかりません", "設定 → プライバシー → カレンダー で Scriptable を「フルアクセス」にしてください。");
+    return null;
+  }
+  for (;;) {
+    const k = await sheet(name + "：出すカレンダー", shown.map(c => (pick.includes(c) ? "✓ " : "○ ") + c).concat(["保存して閉じる"]));
+    if (k < 0) return null;
+    if (k === shown.length) return shown.filter(c => pick.includes(c));
+    const c = shown[k];
+    pick = pick.includes(c) ? pick.filter(x => x !== c) : pick.concat([c]);
+  }
+}
+
+// ============================================================
 // アプリ内プレビュー
 // ============================================================
 async function chooseAction() {
   const opts = [["小", "small"], ["中", "medium"], ["大", "large"]];
   if (Device.isPad()) opts.push(["特大", "extraLarge"]);
-  opts.push(["ロック画面（長方形）", "accessoryRectangular"], ["透明背景を設定", "setup-clear"]);
+  opts.push(["ロック画面（長方形）", "accessoryRectangular"], ["透明背景を設定", "setup-clear"], ["カレンダーのグループを編集", "groups"]);
   const i = await sheet("プレビュー・設定", opts.map(o => o[0]));
   return i >= 0 ? opts[i][1] : null;
 }
@@ -910,7 +1052,17 @@ async function preview(w, family) {
 const family = config.widgetFamily || (config.runsInApp ? await chooseAction() : "medium");
 if (family === "setup-clear") {
   await setupClear();
+} else if (family === "groups") {
+  await groupMenu();
 } else if (family) {
+  // ▶ のプレビュー：グループがあれば、どれで見るか選ぶ
+  if (config.runsInApp) {
+    const groups = await loadGroups();
+    if (groups.length) {
+      const g = await sheet("どのグループで見ますか", ["すべてのカレンダー"].concat(groups.map(x => x.name)));
+      if (g > 0) PREVIEW_NAMES = [groups[g - 1].name];
+    }
+  }
   const widget = await makeWidget(family);
   if (config.runsInApp) await preview(widget, family);
   else Script.setWidget(widget);

@@ -144,7 +144,7 @@ async function run(o) {
     incompleteDueBetween: async (s, e, c) => { if (!(s instanceof Date) || !(e instanceof Date)) throw new TypeError('dueBetween'); return rems().filter(r => !r.isCompleted && r.dueDate && r.dueDate >= s && r.dueDate < e && inCals(r, c)); },
     completedToday: async c => rems().filter(r => r.isCompleted && r.completionDate && sameDay(r.completionDate, new FDate()) && inCals(r, c)),
     allIncomplete: async c => rems().filter(r => !r.isCompleted && inCals(r, c)) };
-  const Calendar = { forRemindersByTitle: async t => { if (rems().some(r => r.calendar.title === t)) return { title: t }; throw new Error('no list ' + t); } };
+  const Calendar = { forEvents: async () => { if (o.fail) throw new Error('denied'); return [...new Set((o.events || []).map(e => e.calendar.title))].map(title => ({ title })); }, forRemindersByTitle: async t => { if (rems().some(r => r.calendar.title === t)) return { title: t }; throw new Error('no list ' + t); } };
   // WebView を表示したとき：o.web(html) が返すものをページの window とする（ページでの操作の結果を模擬）
   class WV extends WebView { async present(full) { if (full !== undefined && typeof full !== 'boolean') throw new TypeError('present'); if (!this.ok) throw new Error('present before load'); log.push('webview'); this.win = o.web ? o.web(this.html) : {}; } }
   const scr = o.pad ? [834, 1194] : (o.screen || [393, 852]);
